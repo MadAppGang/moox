@@ -48,7 +48,9 @@ loaded with `tmux-fingers load-config` when it is on `PATH`.
 (`[105]`), backgrounded and silent; the next makes `paste.sh` work from its key
 binding (the pane id is passed in, a run-shell job has no `TMUX_PANE`) and parse
 the `/image/meta` reply as data instead of `eval`-ing it. moox ships that tree
-unmodified. Its helper `rpaster` is built from `third_party/tmux-copy-image`.
+unmodified. Its helper `rpaster` is built from `third_party/tmux-copy-image` and
+installed in moox's `libexec/`, not on `PATH` (run it as `moox rpaster`), so it
+never collides with a separately installed rpaster.
 
 ## Edits moox carries in tmux-claude-continuity
 

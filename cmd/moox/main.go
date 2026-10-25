@@ -68,6 +68,7 @@ func init() {
 		"restore":   cmdRestore,
 		"snapshot":  cmdSnapshot,
 		"root":      cmdRoot,
+		"rpaster":   cmdRpaster,
 		"version":   cmdVersion,
 		"start":     cmdStart,
 	}
@@ -138,6 +139,7 @@ const usageText = `usage:
   moox snapshot show [-L NAME | -S PATH] [--json]
   moox snapshot unpin [-L NAME | -S PATH] FILE|--all
   moox root
+  moox rpaster [--which | ARGS...]   run the bundled copy-image helper (libexec; else rpaster on PATH)
   moox version | --version`
 
 func usage(w io.Writer) { fmt.Fprintln(w, usageText) }

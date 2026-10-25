@@ -3,6 +3,7 @@ package doctor
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -68,5 +69,51 @@ func TestLegacyText_KeysOnlyResurrectContinuum(t *testing.T) {
 		if !legacyKeyText(leg) {
 			t.Errorf("resurrect/continuum binding %q missed", leg)
 		}
+	}
+}
+
+// TestCheckRpaster_SaysWhichOne (V10): doctor names the rpaster prefix V
+// relies on — moox's bundled libexec copy first — and a separately installed
+// PATH rpaster (madappgang/tap/rpaster) as somebody else's.
+func TestCheckRpaster_SaysWhichOne(t *testing.T) {
+	d := t.TempDir()
+	share := filepath.Join(d, "opt", "moox", "share", "moox")
+	lib := filepath.Join(d, "opt", "moox", "libexec", "rpaster")
+	other := filepath.Join(d, "bin", "rpaster")
+	for _, p := range []string{lib, other} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	onPath := func(name string) (string, error) {
+		if name == "rpaster" {
+			return other, nil
+		}
+		return "", os.ErrNotExist
+	}
+	none := func(string) (string, error) { return "", os.ErrNotExist }
+
+	r := checkRpaster(Env{Root: share}, onPath)
+	if len(r) != 2 || r[0].Level != OK || !strings.Contains(r[0].Message, lib) || !strings.Contains(r[0].Message, "bundled") ||
+		r[1].Level != Info || !strings.Contains(r[1].Message, other) {
+		t.Fatalf("bundled + PATH: %+v", r)
+	}
+	r = checkRpaster(Env{Root: share}, none)
+	if len(r) != 1 || r[0].Level != OK || !strings.Contains(r[0].Message, lib) {
+		t.Fatalf("bundled only: %+v", r)
+	}
+	if err := os.Remove(lib); err != nil {
+		t.Fatal(err)
+	}
+	r = checkRpaster(Env{Root: share}, onPath)
+	if len(r) != 1 || r[0].Level != OK || !strings.Contains(r[0].Message, other) || !strings.Contains(r[0].Message, "on PATH") {
+		t.Fatalf("PATH fallback: %+v", r)
+	}
+	r = checkRpaster(Env{Root: share}, none)
+	if len(r) != 1 || r[0].Level != Info || r[0].Check != "rpaster" {
+		t.Fatalf("none: %+v", r)
 	}
 }

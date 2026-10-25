@@ -16,7 +16,10 @@
 #      only), a local tap local/mooxtest holding the rendered formula:
 #      `brew style`, `brew audit --strict`, `brew install` (dependencies poured
 #      as bottles into the scratch prefix), `brew test`, the keg layout,
-#      `moox root` = the stable opt/ share root, `brew uninstall`;
+#      `moox root` = the stable opt/ share root, `brew uninstall`; then (V10) a
+#      fake `rpaster` formula in the same tap installed FIRST, moox installed
+#      after it: bin/moox and bin/tt are linked, bin/rpaster stays the other
+#      formula's, and `moox rpaster`/`moox doctor` resolve opt/moox/libexec/rpaster;
 #   4. nothing written to the real HOME (~/.config/moox and friends unchanged);
 #   5. fake HOME: `moox setup --dry-run` writes nothing; setup with no
 #      ~/.tmux.conf, with one (separate, and --mode replace); `moox uninstall`
@@ -242,9 +245,14 @@ if [ "$mode" = scratch ]; then
 			if [ -d "$hb/opt/$d" ]; then ok "dependency $d installed with the formula"; else no "dependency $d"; fi
 		done
 		keg="$hb/Cellar/moox/$ver"
-		for b in moox tt rpaster; do
+		for b in moox tt; do
 			if [ -x "$keg/bin/$b" ] && [ -L "$hb/bin/$b" ]; then ok "keg bin/$b, linked into the prefix"; else no "keg bin/$b" "$(ls -la "$keg/bin" "$hb/bin" 2>&1)"; fi
 		done
+		if [ -x "$keg/libexec/rpaster" ] && [ ! -e "$keg/bin/rpaster" ] && [ ! -e "$hb/bin/rpaster" ] && [ ! -L "$hb/bin/rpaster" ]; then
+			ok "rpaster in the keg's libexec/, not bin/, nothing linked as <prefix>/bin/rpaster (V10)"
+		else
+			no "keg libexec/rpaster" "$(ls -la "$keg/bin" "$keg/libexec" "$hb/bin" 2>&1)"
+		fi
 		if [ -f "$keg/share/moox/moox.conf" ] && [ -f "$keg/share/moox/VERSION" ] && [ -d "$keg/share/moox/plugins/tmux-copy-image" ] && [ -f "$keg/share/doc/moox/THIRD_PARTY.md" ]; then
 			ok "pkgshare holds moox.conf, VERSION, the plugins; doc holds THIRD_PARTY.md"
 		else
@@ -261,6 +269,66 @@ if [ "$mode" = scratch ]; then
 		printf '%s\n' "$out" >"$T/brew-test.txt"
 
 		if out=$(hbrew uninstall --formula moox 2>&1) && [ ! -e "$hb/Cellar/moox" ] && [ ! -L "$hb/bin/moox" ]; then ok "brew uninstall removes the keg and links"; else no "brew uninstall" "$out"; fi
+
+		# V10: a user who already has the separate rpaster formula (madappgang/tap/rpaster,
+		# the same copy-image helper) installs moox. With rpaster in moox's bin/, `brew link`
+		# hit bin/rpaster and linked NONE of moox's binaries. A fake `rpaster` formula in the
+		# same scratch tap owns bin/rpaster first; moox must still link bin/moox and bin/tt,
+		# leave the other formula's link alone, and copy-image's helper must still resolve.
+		echo "--- scratch Homebrew: an rpaster formula is already installed (V10)"
+		rpsrc="$T/rpaster-src/rpaster-0.2.1"
+		mkdir -p "$rpsrc"
+		printf '#!/bin/sh\necho "rpaster 0.2.1 (separate formula)"\n' >"$rpsrc/rpaster"
+		chmod 0755 "$rpsrc/rpaster"
+		(cd "$T/rpaster-src" && tar -czf "$T/rpaster-0.2.1.tar.gz" rpaster-0.2.1)
+		cat >"$tap/Formula/rpaster.rb" <<-EOF
+			class Rpaster < Formula
+			  desc "Fake separate rpaster formula for the moox packaging test"
+			  homepage "https://example.invalid/rpaster"
+			  url "file://$T/rpaster-0.2.1.tar.gz"
+			  version "0.2.1"
+			  sha256 "$(sha "$T/rpaster-0.2.1.tar.gz")"
+			  license "MIT"
+
+			  def install
+			    bin.install "rpaster"
+			  end
+			end
+		EOF
+		if out=$(hbrew install --formula local/mooxtest/rpaster 2>&1) && [ "$(readlink "$hb/bin/rpaster")" = "../Cellar/rpaster/0.2.1/bin/rpaster" ]; then
+			ok "the separate rpaster formula owns <prefix>/bin/rpaster"
+		else
+			no "install fake rpaster formula" "$out"
+		fi
+		out=$(hbrew install --formula local/mooxtest/moox 2>&1)
+		rc=$?
+		printf '%s\n' "$out" >"$T/brew-install-with-rpaster.txt"
+		if [ "$rc" -eq 0 ] && ! printf '%s' "$out" | grep -qi 'could not symlink\|brew link --overwrite'; then
+			ok "brew install moox with rpaster present: no link conflict"
+		else
+			no "brew install moox with rpaster present (rc=$rc)" "$out"
+		fi
+		for b in moox tt; do
+			if [ "$(readlink "$hb/bin/$b")" = "../Cellar/moox/$ver/bin/$b" ]; then ok "<prefix>/bin/$b linked to the moox keg despite the rpaster formula"; else no "<prefix>/bin/$b not linked" "$(ls -la "$hb/bin" 2>&1)"; fi
+		done
+		if [ "$(readlink "$hb/bin/rpaster")" = "../Cellar/rpaster/0.2.1/bin/rpaster" ]; then ok "<prefix>/bin/rpaster still the separate formula's"; else no "bin/rpaster changed" "$(ls -la "$hb/bin/rpaster" 2>&1)"; fi
+		# copy-image's helper: what moox.conf sets @moox-rpaster to, from the opt/ share root ...
+		if [ -x "$hb/opt/moox/share/moox/../../libexec/rpaster" ]; then ok "@moox-rpaster's path (<root>/../../libexec/rpaster) exists through opt/moox"; else no "opt libexec rpaster" "$(ls -la "$hb/opt/moox/" 2>&1)"; fi
+		# ... and what `moox rpaster` and doctor resolve (bundled first, not the PATH one).
+		fh="$T/fh-rpaster"
+		mkdir -p "$fh/.tmuxtmp"
+		w=$(env -i HOME="$fh" PATH="$hb/bin:/usr/bin:/bin" TMUX_TMPDIR="$fh/.tmuxtmp" "$hb/bin/moox" rpaster --which 2>&1)
+		if [ "$w" = "$hb/opt/moox/libexec/rpaster (bundled)" ]; then ok "moox rpaster --which = opt/moox/libexec/rpaster (bundled), not the PATH one"; else no "moox rpaster --which" "$w"; fi
+		v=$(env -i HOME="$fh" PATH="$hb/bin:/usr/bin:/bin" TMUX_TMPDIR="$fh/.tmuxtmp" "$hb/bin/moox" rpaster version 2>&1 | tail -n 1)
+		if [ "${v#rpaster "$ver" }" != "$v" ]; then ok "moox rpaster version = rpaster $ver (moox's own build)"; else no "moox rpaster version" "$v"; fi
+		d=$(env -i HOME="$fh" PATH="$hb/bin:/usr/bin:/bin" TMUX_TMPDIR="$fh/.tmuxtmp" "$hb/bin/moox" doctor 2>&1)
+		if printf '%s\n' "$d" | grep -q "^\[ok\] rpaster: $hb/opt/moox/libexec/rpaster (moox's bundled helper" &&
+			printf '%s\n' "$d" | grep -q "rpaster: $hb/bin/rpaster on PATH is a separately installed rpaster"; then
+			ok "moox doctor reports the bundled rpaster it uses and names the separate one on PATH"
+		else
+			no "moox doctor rpaster rows" "$(printf '%s\n' "$d" | grep -i rpaster)"
+		fi
+		if out=$(hbrew uninstall --formula moox rpaster 2>&1) && [ ! -e "$hb/Cellar/moox" ] && [ ! -L "$hb/bin/rpaster" ]; then ok "brew uninstall moox rpaster"; else no "brew uninstall moox rpaster" "$out"; fi
 	fi
 fi
 
@@ -284,7 +352,9 @@ case $(uname -m) in x86_64 | amd64) arch=amd64 ;; aarch64 | arm64) arch=arm64 ;;
 inst="$T/inst"
 mkdir -p "$inst/bin"
 tar -xzf "$dist/moox_${os}_${arch}.tar.gz" -C "$inst"
-for b in moox tt rpaster; do mv "$inst/$b" "$inst/bin/$b"; done
+mkdir -p "$inst/libexec"
+for b in moox tt; do mv "$inst/$b" "$inst/bin/$b"; done
+mv "$inst/rpaster" "$inst/libexec/rpaster"
 moox="$inst/bin/moox"
 host_tmux=$(command -v tmux || true)
 if [ -z "$host_tmux" ]; then
@@ -396,7 +466,7 @@ else
 			echo "--- versions"
 			$HOME/.local/bin/moox --version
 			$HOME/.local/bin/tt --version
-			$HOME/.local/bin/rpaster version | tail -n 1
+			$HOME/.local/bin/moox rpaster version | tail -n 1
 			readlink $HOME/.local/share/moox/current
 			sh /rel/install.sh --uninstall
 			test ! -e $HOME/.local/share/moox && echo UNINSTALLED
@@ -405,7 +475,7 @@ else
 		printf '%s\n' "$out" >"$T/linux.txt"
 		if [ "$rc" -eq 0 ] && printf '%s' "$out" | grep -q -x "moox $ver" && printf '%s' "$out" | grep -q -x "tt $ver (moox)" &&
 			printf '%s' "$out" | grep -q "^rpaster $ver " && printf '%s' "$out" | grep -q -x UNINSTALLED; then
-			ok "Linux ($img, $(uname -m)): install.sh, the three binaries report $ver, uninstall"
+			ok "Linux ($img, $(uname -m)): install.sh, moox, tt and moox rpaster report $ver, uninstall"
 		else
 			no "Linux container rc=$rc" "$out"
 		fi

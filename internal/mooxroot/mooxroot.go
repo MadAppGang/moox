@@ -60,8 +60,9 @@ var ErrNotFound = errors.New("mooxroot: no share/moox found for this executable"
 
 // Root is a resolved installation.
 type Root struct {
-	Share string // stable share root (holds moox.conf)
-	Bin   string // directory holding moox, tt, rpaster
+	Share   string // stable share root (holds moox.conf)
+	Bin     string // directory holding moox and tt
+	Libexec string // directory holding moox's private helpers (rpaster)
 }
 
 // Resolve locates the installation an executable belongs to. exe should be
@@ -72,7 +73,48 @@ func Resolve(exe, cwd string) (Root, error) {
 	if err != nil {
 		return Root{}, err
 	}
-	return Root{Share: share, Bin: filepath.Clean(filepath.Join(share, "..", "..", "bin"))}, nil
+	return Root{Share: share, Bin: filepath.Clean(filepath.Join(share, "..", "..", "bin")), Libexec: LibexecDir(share)}, nil
+}
+
+// LibexecDir is where moox keeps helpers it must not put on PATH, relative to
+// a share root: brew's <keg>/libexec (formula `libexec.install`, reached
+// through opt/moox), install.sh's <version>/libexec (through `current`), a
+// dev tree's moox/libexec. rpaster lives there and not in bin/: the separate
+// madappgang/tap/rpaster formula (or a hand-installed ~/.local/bin/rpaster)
+// owns that name, and a second bin/rpaster made brew refuse to link ANY of
+// moox's binaries (V10).
+func LibexecDir(share string) string {
+	return filepath.Clean(filepath.Join(share, "..", "..", "libexec"))
+}
+
+// RpasterName is the copy-image helper's executable name.
+const RpasterName = "rpaster"
+
+// Rpaster resolves the copy-image helper: moox's own copy in the share root's
+// libexec first, then any rpaster on PATH (look). bundled reports which one
+// was found. share may be "" (no root found): then only PATH is tried.
+func Rpaster(share string, look func(string) (string, error)) (path string, bundled bool, err error) {
+	if share != "" {
+		p := filepath.Join(LibexecDir(share), RpasterName)
+		if isExec(p) {
+			return p, true, nil
+		}
+	}
+	if look != nil {
+		if p, err := look(RpasterName); err == nil {
+			return p, false, nil
+		}
+	}
+	where := "PATH"
+	if share != "" {
+		where = LibexecDir(share) + " or on PATH"
+	}
+	return "", false, fmt.Errorf("mooxroot: no %s in %s", RpasterName, where)
+}
+
+func isExec(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.Mode().IsRegular() && st.Mode()&0o111 != 0
 }
 
 // Stable maps an executable to its stable share root (§3.2).

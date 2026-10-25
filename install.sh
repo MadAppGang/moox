@@ -6,16 +6,21 @@
 #   sh install.sh --uninstall [--purge] [--yes] [--dry-run] [--prefix DIR]
 #
 # Installs into <prefix> (default ~/.local):
-#   <prefix>/share/moox/<version>/        the release archive, binaries moved into bin/
+#   <prefix>/share/moox/<version>/        the release archive; moox and tt moved into bin/,
+#                                         the copy-image helper rpaster into libexec/
 #   <prefix>/share/moox/current           symlink -> <version>
-#   <prefix>/bin/{moox,tt,rpaster}        symlinks -> <prefix>/share/moox/current/bin/*
+#   <prefix>/bin/{moox,tt}                symlinks -> <prefix>/share/moox/current/bin/*
 #   <prefix>/share/moox/install.json      what this installer created (uninstall reads it)
+# rpaster is NEVER linked into <prefix>/bin: that name belongs to a separately
+# installed rpaster (its own installer puts it in ~/.local/bin), which moox must
+# not shadow or replace. moox finds its own copy in libexec (`moox rpaster ...`
+# runs it). A link left there by an older moox install is removed.
 # The archive and checksums.txt come from the SAME release directory and the
 # archive is verified before anything is unpacked. Two older versions are kept.
 # Dependencies are only checked and reported, never installed. Re-running is
 # safe: the same version is re-verified and replaced in place.
 #
-# --yes          do not stop when <prefix>/bin/{moox,tt,rpaster} already exists and is
+# --yes          do not stop when <prefix>/bin/{moox,tt} already exists and is
 #                not ours: move it aside to <name>.pre-moox (uninstall puts it back)
 # --uninstall    run `moox uninstall --yes` (undo `moox setup`), then remove exactly
 #                what install.json lists and restore what it moved aside
@@ -119,13 +124,13 @@ check_deps() {
 }
 
 usage() {
-	sed -n '2,28p' "$0" 2>/dev/null || true
+	sed -n '2,31p' "$0" 2>/dev/null || true
 	exit 2
 }
 
 # bin_conflicts — print each <bindir>/<b> that exists and is not our link.
 bin_conflicts() {
-	for b in moox tt rpaster; do
+	for b in moox tt; do
 		t="$bindir/$b"
 		if [ -L "$t" ]; then
 			[ "$(readlink "$t")" = "$share/current/bin/$b" ] && continue
@@ -134,6 +139,35 @@ bin_conflicts() {
 		fi
 		printf '%s\n' "$t"
 	done
+}
+
+# is_old_rpaster_link — <bindir>/rpaster is the link a moox <= 0.1.0 install made.
+is_old_rpaster_link() {
+	[ -L "$bindir/rpaster" ] && [ "$(readlink "$bindir/rpaster")" = "$share/current/bin/rpaster" ]
+}
+
+# retire_rpaster_link BACKUPS_FILE — remove an older moox's <bindir>/rpaster
+# link (it would dangle: rpaster is in libexec now) and put back the rpaster
+# that install moved aside, dropping that entry from BACKUPS_FILE.
+retire_rpaster_link() {
+	is_old_rpaster_link || return 0
+	rm -f "$bindir/rpaster"
+	say "removed $bindir/rpaster (an older moox's link; moox keeps rpaster in libexec now)"
+	lit=$(json_str "$bindir/rpaster")
+	: >"$1.keep"
+	while IFS="$TAB" read -r p bk; do
+		if [ "$p" = "$lit" ]; then
+			b=$(json_unstr "${bk#\"}")
+			b=${b%\"}
+			if [ -e "$b" ] || [ -L "$b" ]; then
+				mv "$b" "$bindir/rpaster"
+				say "restored $bindir/rpaster from $b"
+				continue
+			fi
+		fi
+		printf '%s\t%s\n' "$p" "$bk" >>"$1.keep"
+	done <"$1"
+	mv -f "$1.keep" "$1"
 }
 
 # old_backups — the backups a previous install.json recorded, as
@@ -154,7 +188,6 @@ write_manifest() { # write_manifest VERSION BACKUPS_FILE
 		printf '  "paths": [\n'
 		printf '    %s,\n' "$(json_str "$bindir/moox")"
 		printf '    %s,\n' "$(json_str "$bindir/tt")"
-		printf '    %s,\n' "$(json_str "$bindir/rpaster")"
 		printf '    %s\n' "$(json_str "$share")"
 		printf '  ],\n'
 		printf '  "backups": [\n'
@@ -218,9 +251,10 @@ re-run with --yes to move each aside to <name>.pre-moox (--uninstall puts them b
 	if [ "$dry" -eq 1 ]; then
 		say "dry run: nothing is downloaded or written"
 		say "would download $url/$asset and $url/checksums.txt and verify sha256"
-		say "would unpack into $share/$ver (binaries into $share/$ver/bin)"
+		say "would unpack into $share/$ver (moox, tt into $share/$ver/bin; rpaster into $share/$ver/libexec)"
 		say "would link $share/current -> $ver"
-		for b in moox tt rpaster; do say "would link $bindir/$b -> $share/current/bin/$b"; done
+		for b in moox tt; do say "would link $bindir/$b -> $share/current/bin/$b"; done
+		if is_old_rpaster_link; then say "would remove $bindir/rpaster (an older moox's link; moox keeps rpaster in libexec now)"; fi
 		printf '%s\n' "$conflicts" | while IFS= read -r c; do
 			[ -z "$c" ] || say "would move $c aside to $c.pre-moox"
 		done
@@ -252,11 +286,13 @@ re-run with --yes to move each aside to <name>.pre-moox (--uninstall puts them b
 		[ -f "$stage/$b" ] || die "$asset has no $b at its root"
 	done
 	[ -f "$stage/share/moox/moox.conf" ] || die "$asset has no share/moox/moox.conf"
-	mkdir "$stage/bin"
-	for b in moox tt rpaster; do
+	mkdir "$stage/bin" "$stage/libexec"
+	for b in moox tt; do
 		mv "$stage/$b" "$stage/bin/$b"
 		chmod 0755 "$stage/bin/$b"
 	done
+	mv "$stage/rpaster" "$stage/libexec/rpaster"
+	chmod 0755 "$stage/libexec/rpaster"
 
 	# A same-version re-install: the active release is renamed aside, not removed,
 	# until the replacement is in place (G4-M6). `current` names the version, so
@@ -292,13 +328,14 @@ re-run with --yes to move each aside to <name>.pre-moox (--uninstall puts them b
 		say "moved $c aside to $bk"
 		printf '%s\t%s\n' "$(json_str "$c")" "$(json_str "$bk")" >>"$tmp/backups"
 	done <"$tmp/conflicts"
-	for b in moox tt rpaster; do
+	for b in moox tt; do
 		ln -sfn "$share/current/bin/$b" "$bindir/$b"
 	done
+	retire_rpaster_link "$tmp/backups"
 	write_manifest "$ver" "$tmp/backups"
 	prune_old
 
-	say "installed moox $ver: $bindir/{moox,tt,rpaster} -> $share/current/bin"
+	say "installed moox $ver: $bindir/{moox,tt} -> $share/current/bin, rpaster in $share/current/libexec (run: moox rpaster)"
 	check_deps
 	case ":${PATH}:" in
 	*":$bindir:"*) ;;

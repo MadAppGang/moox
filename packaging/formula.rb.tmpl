@@ -35,7 +35,10 @@ class Moox < Formula
   conflicts_with "tt", because: "both install a `tt` binary (Tarantool's tt)"
 
   def install
-    bin.install "moox", "tt", "rpaster"
+    bin.install "moox", "tt"
+    # Not bin/: madappgang/tap/rpaster owns bin/rpaster, and a second one makes
+    # `brew link` refuse ALL of moox's binaries. moox finds it here itself.
+    libexec.install "rpaster"
     pkgshare.install Dir["share/moox/*"]
     doc.install "THIRD_PARTY.md", "README.md"
   end
@@ -44,6 +47,8 @@ class Moox < Formula
     <<~EOS
       Run `moox` once to finish setup (it writes ~/.tmux.conf only after asking, with a backup).
       `tt` here is moox's tmux session manager, not Tarantool's `tt`.
+      moox's copy-image helper is not linked as `rpaster` (madappgang/tap/rpaster owns that
+      name and is left alone); run it as `moox rpaster ...`.
     EOS
   end
 
@@ -54,6 +59,8 @@ class Moox < Formula
     assert_match version.to_s, shell_output("#{bin}/moox --version")
     assert_match version.to_s, shell_output("#{bin}/tt --version")
     assert_path_exists pkgshare/"moox.conf"
+    assert_match version.to_s, shell_output("#{bin}/moox rpaster version")
+    refute_path_exists bin/"rpaster"
     # HOME is brew's sandbox temp dir; --dry-run writes nothing.
     system bin/"moox", "setup", "--dry-run", "--yes"
   end

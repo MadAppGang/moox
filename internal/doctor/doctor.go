@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/MadAppGang/moox/internal/engine"
+	"github.com/MadAppGang/moox/internal/mooxroot"
 	"github.com/MadAppGang/moox/internal/sockets"
 	"github.com/MadAppGang/moox/internal/statedir"
 	"github.com/MadAppGang/moox/internal/tmuxtarget"
@@ -216,6 +217,30 @@ func checkTools(ctx context.Context, e Env) []Result {
 		out = append(out, Result{Check: "jq", Level: OK, Message: "on PATH"})
 	}
 	out = append(out, checkTT(ctx, e, look)...)
+	out = append(out, checkRpaster(e, look)...)
+	return out
+}
+
+// checkRpaster says WHICH rpaster the copy-image paste (prefix V) relies on:
+// moox's bundled one in <root>/../../libexec, else one on PATH. moox never
+// puts its copy on PATH (V10: the separate madappgang/tap/rpaster formula
+// owns bin/rpaster), so a PATH rpaster is somebody else's and is named as such.
+func checkRpaster(e Env, look func(string) (string, error)) []Result {
+	p, bundled, err := mooxroot.Rpaster(e.Root, look)
+	switch {
+	case err != nil:
+		return []Result{{Check: "rpaster", Level: Info,
+			Message: "no rpaster (moox's libexec or PATH): prefix V cannot paste a local clipboard image over SSH",
+			Fix:     "reinstall moox (it bundles rpaster in libexec)"}}
+	case !bundled:
+		return []Result{{Check: "rpaster", Level: OK,
+			Message: p + " (on PATH; moox's bundled copy is missing from " + mooxroot.LibexecDir(e.Root) + ")"}}
+	}
+	out := []Result{{Check: "rpaster", Level: OK, Message: p + " (moox's bundled helper; run it as `moox rpaster`)"}}
+	if other, err := look(mooxroot.RpasterName); err == nil && other != p {
+		out = append(out, Result{Check: "rpaster", Level: Info,
+			Message: other + " on PATH is a separately installed rpaster (e.g. madappgang/tap/rpaster); moox leaves it alone"})
+	}
 	return out
 }
 

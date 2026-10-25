@@ -104,18 +104,20 @@ for shell in $shells; do
 	# Fresh install.
 	run_install "$H" --version "v$ver"
 	if [ "$rc" -eq 0 ]; then ok "[$shell] install exits 0"; else no "[$shell] install" "$out"; continue; fi
-	check "[$shell] versioned dir with bin/{moox,tt,rpaster}" test -x "$share/$ver/bin/moox" -a -x "$share/$ver/bin/tt" -a -x "$share/$ver/bin/rpaster"
+	check "[$shell] versioned dir with bin/{moox,tt} and libexec/rpaster" test -x "$share/$ver/bin/moox" -a -x "$share/$ver/bin/tt" -a -x "$share/$ver/libexec/rpaster"
+	check "[$shell] no rpaster in the versioned bin/" test ! -e "$share/$ver/bin/rpaster"
+	check "[$shell] no ~/.local/bin/rpaster (V10: never shadow a separate rpaster)" test ! -e "$bin/rpaster" -a ! -L "$bin/rpaster"
 	check "[$shell] no binary left at the version root" test ! -e "$share/$ver/moox"
 	check "[$shell] share/moox/moox.conf unpacked" test -f "$share/$ver/share/moox/moox.conf"
 	check "[$shell] plugin entry scripts keep +x" test -x "$share/$ver/share/moox/plugins/tmux-sensible/sensible.tmux"
 	if [ "$(readlink "$share/current")" = "$ver" ]; then ok "[$shell] current -> $ver"; else no "[$shell] current link" "$(ls -l "$share")"; fi
-	for b in moox tt rpaster; do
+	for b in moox tt; do
 		if [ "$(readlink "$bin/$b")" = "$share/current/bin/$b" ]; then ok "[$shell] ~/.local/bin/$b -> current/bin/$b"; else no "[$shell] link $b" "$(ls -l "$bin")"; fi
 	done
 	check "[$shell] install.json written" test -f "$share/install.json"
 	if grep -q "\"version\": \"$ver\"" "$share/install.json" && grep -q "\"$share\"" "$share/install.json"; then ok "[$shell] install.json names the version and the share dir"; else no "[$shell] install.json" "$(cat "$share/install.json")"; fi
 	if command -v jq >/dev/null 2>&1; then
-		check "[$shell] install.json is valid JSON" jq -e '.paths | length == 4' "$share/install.json"
+		check "[$shell] install.json is valid JSON" jq -e '.paths | length == 3' "$share/install.json"
 	fi
 	if printf '%s' "$out" | grep -q 'jq is not installed'; then ok "[$shell] warns that jq is missing"; else no "[$shell] jq warning" "$out"; fi
 	if printf '%s' "$out" | grep -q 'tmux 3.4 is too old'; then ok "[$shell] warns that tmux < 3.6"; else no "[$shell] tmux version warning" "$out"; fi
@@ -127,9 +129,14 @@ for shell in $shells; do
 	if [ "$v1" = "moox $ver" ]; then ok "[$shell] ~/.local/bin/moox --version = moox $ver"; else no "[$shell] moox --version" "$v1"; fi
 	v2=$(env -i HOME="$H" PATH="$bin:/usr/bin:/bin" "$bin/tt" --version 2>&1)
 	if [ "$v2" = "tt $ver (moox)" ]; then ok "[$shell] ~/.local/bin/tt --version = tt $ver (moox)"; else no "[$shell] tt --version" "$v2"; fi
-	v3=$(env -i HOME="$H" PATH="$bin:/usr/bin:/bin" "$bin/rpaster" version 2>&1)
+	v3=$(env -i HOME="$H" PATH="$bin:/usr/bin:/bin" "$bin/moox" rpaster version 2>&1)
 	# rpaster prints a first-run tip before the version line (its marker goes under the fake HOME).
-	if printf '%s\n' "$v3" | grep -q -x -F "rpaster $ver (commit none, built unknown)"; then ok "[$shell] HOME=<fake> rpaster version = rpaster $ver"; else no "[$shell] rpaster version" "$v3"; fi
+	if printf '%s\n' "$v3" | grep -q -x -F "rpaster $ver (commit none, built unknown)"; then ok "[$shell] HOME=<fake> moox rpaster version = rpaster $ver"; else no "[$shell] moox rpaster version" "$v3"; fi
+	w=$(env -i HOME="$H" PATH="$bin:/usr/bin:/bin" "$bin/moox" rpaster --which 2>&1)
+	wp=${w% (bundled)}
+	# Physical paths again (macOS /var -> /private/var), and it must go through `current`.
+	if [ "$wp" != "$w" ] && [ "${wp%/current/libexec/rpaster}" != "$wp" ] &&
+		[ "$(cd -P "$(dirname "$wp")" 2>/dev/null && pwd -P)" = "$(cd -P "$share/current/libexec" && pwd -P)" ]; then ok "[$shell] moox rpaster resolves current/libexec/rpaster"; else no "[$shell] moox rpaster --which" "$w"; fi
 	r=$(env -i HOME="$H" PATH="$bin:/usr/bin:/bin" "$bin/moox" root 2>&1)
 	# moox reports the resolved path (macOS: /var -> /private/var); compare physical paths.
 	if [ "$(cd -P "$r" 2>/dev/null && pwd -P)" = "$(cd -P "$share/current/share/moox" && pwd -P)" ] && [ "${r%/current/share/moox}" != "$r" ]; then ok "[$shell] moox root = the stable current/share/moox"; else no "[$shell] moox root" "$r"; fi
@@ -193,6 +200,55 @@ run_install "$H" --uninstall
 now=$(shasum -a 256 "$H/.local/bin/tt" 2>/dev/null || sha256sum "$H/.local/bin/tt" 2>/dev/null)
 now=${now%% *}
 if [ "$rc" -eq 0 ] && [ ! -L "$H/.local/bin/tt" ] && [ "$now" = "$orig" ] && [ ! -e "$H/.local/bin/tt.pre-moox" ]; then ok "--uninstall puts the foreign tt back byte-identical"; else no "restore foreign tt" "rc=$rc $out"; fi
+
+echo "--- a separately installed ~/.local/bin/rpaster (V10)"
+H=$(new_home home-rpaster)
+mkdir -p "$H/.local/bin"
+printf '#!/bin/sh\necho "rpaster 0.2.1 (separate)"\n' >"$H/.local/bin/rpaster"
+chmod 0755 "$H/.local/bin/rpaster"
+orig=$(shasum -a 256 "$H/.local/bin/rpaster" 2>/dev/null || sha256sum "$H/.local/bin/rpaster")
+orig=${orig%% *}
+run_install "$H" --version "v$ver"
+now=$(shasum -a 256 "$H/.local/bin/rpaster" 2>/dev/null || sha256sum "$H/.local/bin/rpaster")
+now=${now%% *}
+if [ "$rc" -eq 0 ] && [ ! -L "$H/.local/bin/rpaster" ] && [ "$now" = "$orig" ] && [ ! -e "$H/.local/bin/rpaster.pre-moox" ] &&
+	[ -L "$H/.local/bin/moox" ] && [ -L "$H/.local/bin/tt" ]; then
+	ok "a foreign ~/.local/bin/rpaster is no conflict (no --yes needed), left byte-identical, moox and tt linked"
+else
+	no "foreign rpaster" "rc=$rc $out"
+fi
+w=$(env -i HOME="$H" PATH="$H/.local/bin:/usr/bin:/bin" "$H/.local/bin/moox" rpaster --which 2>&1)
+if [ "${w% (bundled)}" != "$w" ]; then ok "moox rpaster still uses its bundled copy, not the PATH one"; else no "moox rpaster with a foreign PATH rpaster" "$w"; fi
+run_install "$H" --uninstall
+if [ "$rc" -eq 0 ] && [ -f "$H/.local/bin/rpaster" ] && [ ! -L "$H/.local/bin/rpaster" ]; then ok "--uninstall leaves the foreign rpaster alone"; else no "uninstall with foreign rpaster" "rc=$rc $out"; fi
+
+echo "--- upgrading over a moox <= 0.1.0 layout (~/.local/bin/rpaster was moox's link)"
+H=$(new_home home-legacy-rp)
+run_install "$H" --version "v$ver"
+lshare="$H/.local/share/moox"
+ln -s "$lshare/current/bin/rpaster" "$H/.local/bin/rpaster"
+run_install "$H" --version "v$ver"
+if [ "$rc" -eq 0 ] && [ ! -e "$H/.local/bin/rpaster" ] && [ ! -L "$H/.local/bin/rpaster" ] && printf '%s' "$out" | grep -q "removed $H/.local/bin/rpaster"; then
+	ok "the old (now dangling) rpaster link is removed"
+else
+	no "old rpaster link" "rc=$rc $out $(ls -l "$H/.local/bin")"
+fi
+# The old install had moved a foreign rpaster aside and recorded it: it comes back.
+ln -s "$lshare/current/bin/rpaster" "$H/.local/bin/rpaster"
+printf '#!/bin/sh\necho mine\n' >"$H/.local/bin/rpaster.pre-moox"
+bk_lit="{\"path\": \"$H/.local/bin/rpaster\", \"backup\": \"$H/.local/bin/rpaster.pre-moox\"}"
+awk -v e="$bk_lit" '{ print } /"backups": \[/ { print "    " e }' "$lshare/install.json" >"$T/ij" && mv "$T/ij" "$lshare/install.json"
+run_install "$H" --version "v$ver"
+if [ "$rc" -eq 0 ] && [ -f "$H/.local/bin/rpaster" ] && [ ! -L "$H/.local/bin/rpaster" ] && [ "$(cat "$H/.local/bin/rpaster")" = "$(printf '#!/bin/sh\necho mine')" ] &&
+	[ ! -e "$H/.local/bin/rpaster.pre-moox" ] && ! grep -q 'rpaster' "$lshare/install.json"; then
+	ok "the rpaster an old install moved aside is put back, and dropped from install.json"
+else
+	no "restore pre-moox rpaster" "rc=$rc $out $(cat "$lshare/install.json")"
+fi
+if command -v jq >/dev/null 2>&1; then
+	check "install.json still valid JSON after dropping the backup" jq -e '.backups | length == 0' "$lshare/install.json"
+fi
+run_install "$H" --uninstall
 
 echo "--- uninstall edge cases (G4-M7)"
 H=$(new_home home-unedge)

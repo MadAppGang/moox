@@ -23,7 +23,11 @@ moox
 
 The installer verifies the archive against the release's `checksums.txt`, unpacks
 it into `~/.local/share/moox/<version>/`, points `~/.local/share/moox/current` at
-it and links `moox`, `tt` and `rpaster` into `~/.local/bin`. It only warns about
+it and links `moox` and `tt` into `~/.local/bin`. The copy-image helper
+`rpaster` stays in `~/.local/share/moox/current/libexec/` (brew: the keg's
+`libexec/`) and is never linked as `rpaster`, so a separately installed rpaster
+(`madappgang/tap/rpaster`, or its own installer's `~/.local/bin/rpaster`) is left
+alone; run moox's copy as `moox rpaster ...`. It only warns about
 missing dependencies (tmux >= 3.6, fzf, jq, zsh or bash, optionally
 tmux-fingers and ruby); it never installs them. `install.sh --uninstall` removes
 exactly what it installed (see `~/.local/share/moox/install.json`).
@@ -42,6 +46,7 @@ moox doctor [--json] [--fix stale|legacy-hooks|restoring|all]
 moox uninstall [--yes] [--dry-run] [--purge]
 moox save | restore | restart | import | snapshot show|unpin
 moox root | version
+moox rpaster [--which | ARGS...]         run the bundled copy-image helper (rpaster)
 tt                                       session manager TUI (also: tt serve, tt sessions)
 ```
 
