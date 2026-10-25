@@ -1,0 +1,171 @@
+{
+ "format": "moox-snapshot",
+ "version": 1,
+ "created_at": "2026-10-24T00:40:46+01:00",
+ "producer": "moox 0.1.0",
+ "source": "save",
+ "tmux_version": "3.8",
+ "socket": {
+  "name": "default",
+  "key": "default"
+ },
+ "server": {
+  "pid": 812,
+  "start_time": 1761262800
+ },
+ "client": {
+  "session": "dotfiles",
+  "last_session": "api.v2"
+ },
+ "contents": {
+  "file": "moox-20261024T004046.contents.gz",
+  "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "panes": 2,
+  "captured_at": "2026-10-24T00:40:46+01:00",
+  "server": {
+   "pid": 812,
+   "start_time": 1761262800
+  }
+ },
+ "sessions": [
+  {
+   "name": "dotfiles",
+   "group": "",
+   "grouped_with": "",
+   "active_window": 1,
+   "last_window": 2
+  },
+  {
+   "name": "api.v2",
+   "group": "g",
+   "grouped_with": "",
+   "active_window": 1,
+   "last_window": -1
+  },
+  {
+   "name": "api-peek",
+   "group": "g",
+   "grouped_with": "api.v2",
+   "active_window": 1,
+   "last_window": -1
+  }
+ ],
+ "windows": [
+  {
+   "session": "dotfiles",
+   "index": 1,
+   "id": "@4",
+   "name": "zsh",
+   "active": true,
+   "last": false,
+   "zoomed": false,
+   "automatic_rename": "on",
+   "layout": "{\"V\":2,\"L\":{\"t\":\"h\",\"w\":167,\"h\":51,\"x\":0,\"y\":0,\"c\":[{\"t\":\"p\",\"w\":83,\"h\":51,\"x\":0,\"y\":0,\"a\":true,\"i\":1,\"I\":\"%1\"},{\"t\":\"p\",\"w\":83,\"h\":51,\"x\":84,\"y\":0,\"l\":0,\"i\":2,\"I\":\"%2\"}]}}",
+   "layout_format": "v2",
+   "width": 167,
+   "height": 51
+  },
+  {
+   "session": "dotfiles",
+   "index": 2,
+   "id": "@5",
+   "name": "fix; test",
+   "active": false,
+   "last": true,
+   "zoomed": false,
+   "automatic_rename": "off",
+   "layout": "4b3f,167x51,0,0,3",
+   "layout_format": "v1",
+   "width": 167,
+   "height": 51
+  },
+  {
+   "session": "api.v2",
+   "index": 1,
+   "id": "@6",
+   "name": "#(touch x)",
+   "active": true,
+   "last": false,
+   "zoomed": true,
+   "automatic_rename": "unset",
+   "layout": "4b40,167x51,0,0,4",
+   "layout_format": "v1",
+   "width": 167,
+   "height": 51
+  }
+ ],
+ "panes": [
+  {
+   "key": "dotfiles:1.1",
+   "session": "dotfiles",
+   "window": 1,
+   "index": 1,
+   "saved_id": "%1",
+   "title": "✳ Claude Code",
+   "cwd": "/home/user/dev/proj",
+   "active": true,
+   "current_command": "2.1.309",
+   "full_command": "claude --dangerously-skip-permissions",
+   "role": "claude",
+   "launch": "wt foo red",
+   "claude": {
+    "session_id": "0b9a1c2d-0000-4000-8000-000000000001",
+    "launcher": "claudish",
+    "replay": "--model x -d"
+   },
+   "frozen_key": "",
+   "contents": true
+  },
+  {
+   "key": "dotfiles:1.2",
+   "session": "dotfiles",
+   "window": 1,
+   "index": 2,
+   "saved_id": "%2",
+   "title": "",
+   "cwd": "/home/user/dir with space",
+   "active": false,
+   "current_command": "zsh",
+   "full_command": "-zsh",
+   "role": "shell",
+   "launch": "",
+   "claude": null,
+   "frozen_key": "",
+   "contents": true
+  },
+  {
+   "key": "dotfiles:2.1",
+   "session": "dotfiles",
+   "window": 2,
+   "index": 1,
+   "saved_id": "%3",
+   "title": "❄ FROZEN k1 2p/1s 2026-10-20",
+   "cwd": "/home/user",
+   "active": true,
+   "current_command": "zsh",
+   "full_command": "-zsh",
+   "role": "frozen",
+   "launch": "",
+   "claude": null,
+   "frozen_key": "k1",
+   "contents": false
+  },
+  {
+   "key": "api.v2:1.1",
+   "session": "api.v2",
+   "window": 1,
+   "index": 1,
+   "saved_id": "%4",
+   "title": "x;",
+   "cwd": "/home/user/a;b#c",
+   "active": true,
+   "current_command": "tail",
+   "full_command": "tail -f log",
+   "role": "program",
+   "launch": "tail -f log",
+   "claude": null,
+   "frozen_key": "",
+   "contents": false
+  }
+ ]
+}

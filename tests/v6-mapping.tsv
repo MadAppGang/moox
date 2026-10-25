@@ -1,0 +1,162 @@
+# v6-mapping.tsv — V6 (architecture §6.7): every behaviour/regression id from
+# the research inventory (tests/v6-ids.txt) -> the component that owns it ->
+# the tests that cover it. Input of tests/v6-coverage.test.sh, which fails
+# unless every inventory id is in column 1 and every name in column 3 is a real
+# test: a Go test/benchmark/fuzz function (go test -list, all packages, all
+# build tags, both modules) or a tests/*.test.sh file. A row whose column 3 is
+# "RETIRED: §6.8" has no test by design (§6.8 says why).
+#
+# Columns (TAB-separated): ids (comma-separated) | component | tests
+# (space-separated) | note | table (the §6.7 table the row belongs to).
+# Edit this file and architecture §6.7 together.
+B1,B2	zsh + bash hook	tests/hook-record.test.sh tests/hook-bash-record.test.sh	first line recorded; cleared at prompt	Continuity behaviours B1–B49
+B3,B4	zsh + bash hook	tests/hook-resume.test.sh tests/hook-bash-resume.test.sh	one-shot, child not exec, records the replayed line first	Continuity behaviours B1–B49
+B5	hook C1	TestE2E_Hook_ForeignServerWritesNothing		Continuity behaviours B1–B49
+B6	sidmap	TestSidmap_ClimbAnyDepth TestSidmap_DepthCap25NoPane	depth 0, 2, 24	Continuity behaviours B1–B49
+B7	sidmap	TestSidmap_ShallowestWins		Continuity behaviours B1–B49
+B8	sidmap	TestSidmap_MCPHelperPathYieldsNoPane		Continuity behaviours B1–B49
+B9	sidmap	TestSidmap_RegistryBeatsScrape		Continuity behaviours B1–B49
+B10	sidmap	TestSidmap_OneSessionOnePane_StableAcrossSaves TestSidmap_GroupedDoesNotStealSid		Continuity behaviours B1–B49
+B6,B7,B8,B9,B10	sidmap vs `cc_sidmap.awk` (parity)	TestSidmap_ParityWithAwk	same ps/panes/by-pid fixtures through both; outputs equal	Continuity behaviours B1–B49
+B11,B12	capture + relaunch	TestSave_ClaudishReplayInjectsLiveModel TestSave_PsEwwSinglePidOnly		Continuity behaviours B1–B49
+B13	capture + relaunch	TestSave_RecordingAttachedByPaneID TestRelaunch_ShellRoleWithRecordingReplays TestRelaunch_NonClaudeRecordingKeepsFlags		Continuity behaviours B1–B49
+B14	capture	TestSave_TmuxMCPHelperIsLayoutOnly TestSave_AcquiredPaneKept		Continuity behaviours B1–B49
+B15	capture	TestSave_EmptyRecordingIsAbsent		Continuity behaviours B1–B49
+B16	capture	TestSave_FreshEachTimeIdempotent		Continuity behaviours B1–B49
+B17,B24	snapshot	TestSnapshot_NoPositionalFields TestSnapshot_EmptyTitleKeepsCwd		Continuity behaviours B1–B49
+B18	snapshot.Validate	TestValidate_DuplicateKeys TestValidate_TruncatedDump		Continuity behaviours B1–B49
+B19	store	TestStore_NeverPublishesInvalid		Continuity behaviours B1–B49
+B20	store.ClobberGuard	TestClobber_BlocksSidWipe TestClobber_AllowsWhenFrozenAccountsByID		Continuity behaviours B1–B49
+B21	store	TestStore_PointerNeverDangles_ConcurrentSaves TestStore_HealFromNewest12		Continuity behaviours B1–B49
+B22	store.Lock (kernel `flock`, never unlinked)	TestLock_ContendedIsBusy TestLock_ReleasedOnHolderDeath TestLock_NoReclaimRace TestLock_SameProcessSecondHolderBusy TestLock_BusyNeverWaits		Continuity behaviours B1–B49
+B23	saver + cc_freeze heartbeat	TestSaver_HeartbeatNeverBlocksSave tests/freeze-heartbeat.test.sh		Continuity behaviours B1–B49
+B25	capture	TestSave_ExecCountIsConstant BenchmarkE2E_V5_SaveCost	66-pane fake: ≤5 execs	Continuity behaviours B1–B49
+B26	cc_freeze/cc_thaw	tests/freeze-save-calls-moox.test.sh	stub `moox` returns 0/75/5/4/1/124	Continuity behaviours B1–B49
+B27	engine.BootGate	TestE2E_Gate_ScratchServerNeverRestores TestGate_NotCold TestGate_OneWindowSnapshotSkipped TestE2E_ColdStart_GateSeesZeroSessions TestE2E_ColdStart_ServerSurvivesGateReturn TestGate_WaitBootstrapIsBounded TestSaver_BootNoBootstrapSkips		Continuity behaviours B1–B49
+B28	engine.Purge	TestE2E_Purge_PendingOnColdStart_NoSnapshot TestE2E_Purge_LaunchOnColdStart TestPurge_KeepsRecordingsNewerThanStart TestE2E_Purge_PendingOnColdStart_InvalidSnapshot TestE2E_Purge_PendingOnColdStart_Handover TestE2E_Purge_PendingOnColdStart_UnknownStartTime		Continuity behaviours B1–B49
+B29	saver + store.Lock + pristine guard	TestSaver_SuppressedDuringRestore TestE2E_Restore_CrossProcessSuppressesUntilLaunch TestE2E_Save_DirectSaveDuringRestoreNotPublished		Continuity behaviours B1–B49
+B30	relaunch	TestRelaunch_QualificationTable TestRelaunch_UnenrichedClaudeLauncher	sid / recording / processes match / legacy claude / none	Continuity behaviours B1–B49
+B31	relaunch	TestRelaunch_SidIsAuthoritative		Continuity behaviours B1–B49
+B32	relaunch	TestRelaunch_Priority TestRelaunch_WtCase TestRelaunch_ReadsLegacyClaudishOption	table a–f	Continuity behaviours B1–B49
+B33	relaunch	TestStripSessionFlags_FixedPoint TestStripSessionFlags_DedupeSkipPermissions		Continuity behaviours B1–B49
+B34	relaunch	TestSafeSID_RejectsInjection		Continuity behaviours B1–B49
+B35	restore (direct map retires the resolver)	TestE2E_Restore_DuplicateTitlesDistinctPanes TestRestore_PositionSidecarIgnored		Continuity behaviours B1–B49
+B36,B37	restore via env (C2); retired from the restore path, kept in shell for thaw	TestE2E_Restore_EnvDeliveryNoNudge TestE2E_Restore_SlowShellStillResumes tests/thaw-nudge.test.sh	restore path: env delivery, no nudge (§6.8); thaw keeps the bare-Enter nudge after a fresh-shell respawn	Continuity behaviours B1–B49
+B38	restore + `cc_freeze.sh reclaim`	TestE2E_Restore_TombstoneFirstNoRelaunch TestE2E_Restore_FrozenTitleSurvivesShellOSC TestE2E_Restore_TombstoneBannerIsContentsNotJudged tests/thaw-clears-allow-set-title.test.sh		Continuity behaviours B1–B49
+B39	restore	TestE2E_Restore_TitlesVerbatim TestE2E_Restore_TitleWithFormatIsLiteral FuzzLiteralRoundTrip		Continuity behaviours B1–B49
+B40	importer	TestImport_HealScarredTitle		Continuity behaviours B1–B49
+B41	verdict	TestBootVerdict_Accounting TestBootVerdict_SessionCreateFailureIsMiss TestBootVerdict_UnattemptedSessionsAreMisses	considered=0, negative denominator, FROZEN-ORPHAN miss, CLAIM-FAILED warning, all-frozen = NOTHING, missing banner, fail-closed session = misses, no `absent`	Continuity behaviours B1–B49
+B42	verdict	TestLaunchVerdict_States TestE2E_LaunchVerdict_ConsumeThenExitBeforeFirstProbe TestLaunchVerdict_NonClaudeOKEarly	fake clock: OK/EXITED/NOT-FIRED/STALLED/GONE per kind	Continuity behaviours B1–B49
+B43	restore (log only, read-only store)	TestRestore_StaleFrozenIntentLoggedNotRefrozen		Continuity behaviours B1–B49
+B44	restore → shell	TestE2E_Restore_RunsTabReconcileLast	stub script records the call	Continuity behaviours B1–B49
+B45	capture + layout	TestSave_ObserverRole TestLayout_RemoveObserverLeaf TestE2E_Restore_NoObserverPanes		Continuity behaviours B1–B49
+B46	relaunch + capture + hook	TestRelaunch_NvimSessionStrategy TestE2E_Restore_ContentsPrintedOnce TestSave_ContentsAllRolesFullHistory		Continuity behaviours B1–B49
+B47	ManualPreconditions	TestRestore_NeverIntoPopulatedServer		Continuity behaviours B1–B49
+B48	on_session_start.sh (shell)	tests/on-session-start-skips.test.sh	agent_type and -p/--print/--output-format skip; CLAUDISH_ACTIVE_MODEL_NAME does not; by-pid always, sidecar only with TMUX_PANE	Continuity behaviours B1–B49
+B49	on_session_start.sh / on_stop.sh (shell)	tests/tab-reconcile-timing.test.sh	1 s delay on SessionStart, every turn on Stop above its early exits	Continuity behaviours B1–B49
+R1	relaunch	TestRelaunch_WtCase		Continuity regressions R1–R37
+R2	sidmap	TestSidmap_ClimbAnyDepth	depth 2 wrapper	Continuity regressions R1–R37
+R3	sidmap + capture	TestSidmap_ClimbAnyDepth TestSave_FullCommandRule	depth 0	Continuity regressions R1–R37
+R4	relaunch	TestRelaunch_MCPChildFullCmdStillRelaunches		Continuity regressions R1–R37
+R5	restore	TestE2E_Restore_DuplicateTitlesDistinctPanes		Continuity regressions R1–R37
+R6	restore	TestE2E_Restore_RenumberedWindowNoMisroute		Continuity regressions R1–R37
+R7	restore	TestRestore_PositionSidecarIgnored		Continuity regressions R1–R37
+R8	sidmap	TestSidmap_OneSessionOnePane_StableAcrossSaves		Continuity regressions R1–R37
+R9,R10	relaunch	TestRelaunch_ClaudishNeverPlainClaude TestSave_ClaudishReplayInjectsLiveModel		Continuity regressions R1–R37
+R11,R12	relaunch	TestStripSessionFlags_DedupeSkipPermissions TestStripSessionFlags_FixedPoint		Continuity regressions R1–R37
+R13	capture	TestCapture_ExactFieldCountSplit		Continuity regressions R1–R37
+R14	importer	TestImport_HealScarredTitle		Continuity regressions R1–R37
+R15,R16,R18	engine.Purge	TestE2E_Purge_PendingOnColdStart_NoSnapshot TestE2E_Purge_ReloadKeepsPending TestE2E_Purge_OnlyOwnSocket		Continuity regressions R1–R37
+R17	hook C1	TestE2E_Hook_InheritedEnvWritesNothing tests/hook-env-dirs.test.sh tests/continuity-nonparticipating-server.test.sh TestKey_TmuxTmpdirScratchNamedDefaultIsNotLegacy	inherited env and a scratch -S …/default write nothing; the real server's launch/<N> is untouched	Continuity regressions R1–R37
+R19	BootGate	TestE2E_Gate_ScratchServerNeverRestores		Continuity regressions R1–R37
+R20	capture	TestSave_TmuxMCPHelperIsLayoutOnly		Continuity regressions R1–R37
+R21	store	TestStore_PointerNeverDangles_ConcurrentSaves TestStore_FsyncOrder		Continuity regressions R1–R37
+R22	snapshot.Validate	TestValidate_TruncatedDump		Continuity regressions R1–R37
+R23	importer + Validate	TestImport_ContinuationsNotJudgedDoubled	the live snapshot's ~30 `-zsh`/`<defunct>` continuation lines	Continuity regressions R1–R37
+R24,R25	store.ClobberGuard	TestClobber_BlocksSidWipe TestClobber_AllowsWhenFrozenAccountsByID		Continuity regressions R1–R37
+R26	verdict	TestBootVerdict_Accounting		Continuity regressions R1–R37
+R27	verdict	TestE2E_LaunchVerdict_ConsumeThenExitBeforeFirstProbe	a stub `wt` that prints usage and exits 1	Continuity regressions R1–R37
+R28	ManualPreconditions	TestRestore_NeverIntoPopulatedServer		Continuity regressions R1–R37
+R29	restore via env	TestE2E_Restore_SlowShellStillResumes	the hook consumes on its first prompt, however late	Continuity regressions R1–R37
+R30	cold start	TestE2E_ColdStart_RestoreAfterConfigComplete	the R30 analog: the boot restore starts only after the bootstrap session exists, which is after `cfg_done`, so every option the restore reads was set by the finished config; E4, Q1	Continuity regressions R1–R37
+R31	restore + reclaim	TestE2E_Restore_TombstoneFirstNoRelaunch		Continuity regressions R1–R37
+R32	sidmap	TestSidmap_MCPConfigIsNotAHelper		Continuity regressions R1–R37
+R33	relaunch	TestSafeSID_RejectsInjection		Continuity regressions R1–R37
+R34	on_session_start.sh	tests/on-session-start-outside-tmux.test.sh	a Claude outside tmux claims no pane and makes no pane-resolving tmux call	Continuity regressions R1–R37
+R35	relaunch + hook	TestRelaunch_FirstLineOnly tests/hook-record.test.sh	newline case	Continuity regressions R1–R37
+R36	importer	TestImport_SpaceInPath		Continuity regressions R1–R37
+R37	hook	tests/hook-record.test.sh	finished `terraform apply` not replayed	Continuity regressions R1–R37
+X1,X10	hook C1 + per-socket dirs	TestE2E_Hook_ForeignServerWritesNothing TestPaths_DistinctPerKey		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X2,X3	Purge	TestE2E_Purge_OnlyOwnSocket		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X4	per-socket position sidecars (§4.2, §7)	tests/participating-requires-own-socket.test.sh tests/claude-hook-excluded-server.test.sh	equal #S-#I-#P across servers: only the own server's dir is written	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X5	join foreign rule + tab reconcile	TestJoin_ForeignServerIsNotDead TestJoin_SameSessionNameOtherServerIsForeign tests/tab-reconcile-foreign.test.sh		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X6,X8	sockets.Paths	TestPaths_DistinctPerKey TestFor_LegacyAndKeyedLayouts TestPaths_NondefaultSaveUsesExactPerKeyPathsAndNoStrayLegacyArtifacts		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X7	store.Lock (per-socket dir; a kernel lock dies with its process, so no previous server life can hold it)	TestLock_ReleasedOnHolderDeath		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X9	shell `TMUX_CMD`	tests/no-bare-tmux.test.sh	every vendored tmux call goes through $TMUX_CMD, built from ${TMUX%%,*}	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X11	sockets.Key	TestKey_SameBasenameDifferentDir TestKey_MacPrivateTmpIsDefault TestKey_TmuxTmpdirScratchNamedDefaultIsNotLegacy TestKey_SymlinkSpellingsAgree		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X12	capture registry GC	TestSave_ByPidGC_SafeAcrossServers		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+X13	conf	TestConf_NoHardcodedHomePaths		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I1	engine save (no post-save hook)	TestSave_NoResurrectHookOptionsRead		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I2	store publish	TestStore_FsyncOrder		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I3	BootGate: both purges run in the cold gate, before the snapshot is read; no pre-restore hook, no extra config run-shell (R2-L7)	TestConf_SingleGateRunShell TestE2E_Purge_PendingOnColdStart_NoSnapshot		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I4	restore phase 2 in-engine	TestE2E_ColdStart_RestoreAfterConfigComplete		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I5	importer	TestImport_ClaudeCmdFullBase64WithPadding		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I6	saver	TestE2E_V2_DebouncedSave TestConf_NoStatusJobSave	no `#(` save in status-right	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I7	BootGate + saver	TestGate_Handover TestSaver_SuppressedDuringRestore		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I8	store heal	TestStore_HealFromNewest12		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I9	relaunch / capture options	TestRelaunch_ProcessesRules TestRelaunch_NvimSessionStrategy TestSave_ContentsOption		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I10	cc_freeze/cc_thaw	tests/freeze-save-calls-moox.test.sh		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I11	cc_popup reads options only; doctor	tests/popup-no-resurrect-reads.test.sh TestDoctor_NoResurrectChecks	popup and scripts never read resurrect; doctor's results ignore a broken resurrect tree	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I12	tt TUI → daemon request	TestReadMooxSnapshot TestRequestRestoreNeedsASnapshot TestE2E_TUIHandoverThenRestore		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+I13	tab reconcile owns tab state	TestE2E_Restore_RunsTabReconcileLast		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+C1	hook	TestE2E_Hook_InheritedEnvWritesNothing tests/hook-env-dirs.test.sh tests/hook-legacy-veto.test.sh TestGate_LegacyVetoLifecycle		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+C2	hook + restore	TestE2E_Restore_EnvDeliveryNoNudge TestE2E_Restore_ResumeNotInheritedBySiblings TestE2E_Restore_ResumeNotInheritedByUserNewWindow TestE2E_Restore_EnvClearFailureKillsSession TestE2E_Restore_ShellPaneStaysArmedForThaw	session names `main`, `a.b`, `a:b`, `a\b`	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+C3	on_stop.sh	tests/on-stop-no-pane.test.sh	`TMUX_PANE` unset: no position write, no tmux call	Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+C4	importer	TestImport_SpaceInPath		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+C5	cc_freeze/cc_thaw	tests/freeze-save-calls-moox.test.sh		Multi-server X1–X13, integration points I1–I13, plugin edits C1–C5
+S1,S2,S3	saver (replaces continuum's trigger, lock and background save)	TestE2E_Saver_NoClientNoStatusBar		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S4	engine save step order	TestSave_StepOrder	fake runner records: lock → read → ps → recordings → registry → sidmap → contents → validate → guard → publish → retention	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S5	capture + restore	TestSave_GroupedSecondaryRowsDropped TestE2E_RoundTrip_GroupedSessions		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S6,S7	capture	TestSave_OneTmuxReadChain		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S8	store + saver	TestStore_UnchangedNotRepublishedAcrossTimes TestSave_ContentsCadence TestSaver_BackupReArmsWhileAttached TestSaver_DetachRequestsContents TestSave_ContentsReuseKeyedByPaneID		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S9	store retention + pins	TestRetention_KeepsPolicyAndTarget TestRetention_RanksOnlyMooxNames TestRetention_KeepsPinsAfterIncomplete TestPins_TwoFailuresKeepBoth TestPins_SmallerPassKeepsLargerPin		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+S10	capture	TestSave_ObserverRole		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T1,T2	BootGate	TestGate_NotCold TestE2E_ColdStart_GateSeesZeroSessions		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T3	restore	TestE2E_V3_RoundTrip		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T4	restore + hook	TestE2E_Restore_ContentsPrintedOnce		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T5	restore bootstrap	TestE2E_Restore_BootstrapUntouchedAndDropped TestE2E_Restore_DropsBootstrapOneSessionSnapshot TestE2E_Restore_RenamesCollidingBootstrap		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T6	restore	TestE2E_Restore_AutomaticRenameTriState		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T7	—	RETIRED: §6.8	pre-restore-pane-processes hook, unset here	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T8	relaunch	TestRelaunch_ProcessesRules	plain, `~`, `->`, `*`	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T9	relaunch + capture	TestE2E_Restore_NoObserverPanes		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T10	restore	TestE2E_Restore_ZoomAfterLayout TestE2E_Restore_ActivePane		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T11	restore	TestE2E_RoundTrip_GroupedSessions TestE2E_Restore_NoClientSetsTarget TestE2E_Restore_DefaultSizeUnset TestE2E_Restore_WindowSizesFromLayout		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T12	verdict	TestE2E_Restore_ScratchContentsCleared		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+T13	engine	TestRestore_ReadsSnapshotOnce		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+G1	BootGate socket check	TestE2E_Gate_ScratchServerNeverRestores		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+G2	BootGate + saver	TestSaver_SuppressedDuringRestore		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+G3	BootGate	TestGate_Handover		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+G4	BootGate	TestGate_OneWindowSnapshotSkipped TestE2E_ColdStart_RestoreAfterConfigComplete		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+G5	—	RETIRED: §6.8	continuum's halt file; D10 removes continuum	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+H1,H2,H3	store heal / importer	TestStore_HealFromNewest12 TestImport_DirResolvesLastNeverMoox		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+U1	engine Last	TestReadMooxSnapshot	moox-last of the server's own key through the engine; heals a dangling pointer, writes nothing	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+U2	tt TUI	TestCanRestoreRequiresBothHalves TestRestoreKeyInertWithSessions TestRestoreKeysStartTheRestore TestKeysInertWhileRestoring TestEmptyStateOffersRestore	offer only when empty, enter/ctrl+s, keys inert while restoring, restore runs as a tea.Cmd	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+U3	tt TUI → daemon	TestE2E_TUIHandoverThenRestore TestE2E_Restore_NoServerBootstrapsWithHandover TestE2E_Handover_AutosaveKeepsMooxLast		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+U4	tt.conf hold	TestConf_HoldIncludesRestoring TestLiveCase17_AFreshServerKeepsResurrectsFromScratchSignal	tmuxlive case 17: a fresh server's lone pane gets no sidebar	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR1	snapshot	TestCapture_ExactFieldCountSplit TestSnapshot_EmptyTitleKeepsCwd		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR2	snapshot.Validate	TestValidate_TruncatedDump		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR3	store	TestStore_PointerNeverDangles_ConcurrentSaves		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR4	engine save + saver	TestSave_RestoringRefusals TestGate_RecoversLeftoverRestoringFrom TestSaver_UnparsableRestoringIsRestoring TestPins_CrashMidRestoreBecomesPin	a dead restorer's @moox-restoring is cleared and its restoring-from pinned; a live or unparsable one refuses	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR5	BootGate	TestE2E_Gate_ScratchServerNeverRestores		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR6	restore via env	TestE2E_Restore_EnvDeliveryNoNudge		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR7	Purge + C2	TestE2E_Purge_PendingOnColdStart_NoSnapshot		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR8	BootGate	TestGate_OneWindowSnapshotSkipped		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR9	tt.conf hold	TestConf_HoldIncludesRestoring TestE2E_Restore_NoSidebarDuringRestore		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR10	layout	TestLayout_RemoveObserverLeaf TestE2E_Layout_RemoveLeafAcceptedByTmux		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR11	store heal	TestStore_HealFromNewest12		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR12	conf lint (conf files and vendored plugin entry scripts) + loaded hooks	TestConf_EveryRunShellSilentAndTrue TestE2E_Conf_LoadedHooksSilentAndIndexed		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR13	layout	TestLayout_V2toV1Checksum TestRestore_LayoutCrossVersionFallback FuzzLayoutRoundTrip	3.6a/3.7 get v1, 3.8 v2 then v1, then tiled + LAYOUT-FALLBACK	Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR14	store + importer	TestStore_ContentsBoundToSnapshot TestImport_StaleContentsDropped		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR15	importer	TestImport_ContinuationLooksLikeRecord		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR16	restore clients + capture	TestE2E_Restore_NoClientSetsTarget TestSave_DetachedKeepsClientSession		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17
+RR17	conf order + cold start	TestConf_HistoryLimitBeforeGate TestE2E_ColdStart_BootstrapHistoryLimit		Resurrect behaviours S1–S10, T1–T13, G1–G5, H1–H3, U1–U4 and regressions RR1–RR17

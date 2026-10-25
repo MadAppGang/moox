@@ -1,0 +1,3 @@
+# Sourced files are resolved relative to the script that sources them.
+source-path=SCRIPTDIR
+external-sources=true

@@ -1,0 +1,39 @@
+# ~/.config/tt/panel.conf — how each row of the tt session panel is drawn.
+# Edits apply on the panel's next update; `tt panel-render --check` lints this file.
+# {token[:option[:option]]}   {{ and }} are literal braces   {>} is the spring (fills the gap)
+# A token with nothing to say vanishes together with the separator before it.
+
+row       = "{gutter}{status:code} {runtime:badge}  {name:badge}{>}{ctx:nobar}"
+meta      = "     {group}"
+
+attn_row  = "{gutter}{status:code} {runtime:badge}  {name:badge}{>}{ctx:nobar}"
+attn_why  = "{waiting} · {why}"
+attn_meta = "     {group}"
+
+# Dim lines under a row, 0 to 3, indented under the code and carrying the row's
+# /color bar: a band row's attn_why (why it waits), any other row the latest
+# thing its session said. meta and attn_meta add one more line after them when
+# there is room; the built-in ones name a band row's home group, and the real
+# group of a row folded into "other". For more, try
+# meta = "     {group} · {model:short} · {sub} · {apierr}".
+text_lines = 3
+
+# Context count colour: green below ctx_warn, honey up to ctx_alert, red above it.
+ctx_warn  = 200k
+ctx_alert = 400k
+
+# Context window per model, for the bar ({ctx} draws the count and the bar,
+# {ctxbar} the bar alone). The first rule whose pattern (path.Match, on the
+# model id) matches wins; rules in your own file are tried before these.
+window claude-opus-5*   = 1M
+window claude-sonnet-5* = 1M
+window claude-fable-5*  = 1M
+window claude-*         = 200k
+
+# {status:code} is the status code, {runtime:badge} the time since start. To add
+# the context bar back, end both rows with {ctx} instead of {ctx:nobar}.
+# {status:badge} joins code and runtime in one split badge. {status:icon} draws
+# an emoji instead, 1 or 2 columns each (no U+FE0F, no joined emoji), set per
+# status with icon_busy icon_work icon_waiting icon_blocked icon_idle icon_shell
+# icon_unclear icon_ended, for example icon_idle = "·". {status:chip} is the
+# first rebuild's chip.

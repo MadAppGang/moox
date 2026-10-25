@@ -1,0 +1,15 @@
+# Dev binaries: `task build` puts them here (architecture §2.1); a bare
+# `go build ./cmd/moox` / `./cmd/tt` drops them at the module root (F6).
+/bin/
+/moox
+/tt
+
+# GoReleaser output, and the version stamp its `before` hook writes (§9.1).
+/dist/
+/share/moox/VERSION
+
+# The two fixtures the tt suite needs (architecture §2.2 step 5). The
+# repository-wide *.key rule and cmd/tt's .claude/ rule would drop them; both
+# are synthetic (the .key holds a "never open me" sentence, no key material).
+!internal/observer/testdata/registry/*.key
+!internal/observer/testdata/jobs/decoy-nested/**

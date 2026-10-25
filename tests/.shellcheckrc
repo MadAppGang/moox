@@ -1,0 +1,5 @@
+# Test idioms: `cond && ok … || no …` reports both outcomes on purpose (SC2015),
+# and expected literal command lines are single-quoted on purpose (SC2016).
+source-path=SCRIPTDIR
+external-sources=true
+disable=SC2015,SC2016

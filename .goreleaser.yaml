@@ -1,0 +1,115 @@
+# GoReleaser (OSS, v2) — builds the four release archives and checksums.txt, nothing else.
+#
+# Architecture §9.1 (A10): no `brews:` (deprecated; `goreleaser check` exits 1 on it). The
+# Homebrew formula is rendered from packaging/formula.rb.tmpl by packaging/render-formula.sh
+# and published by scripts/release-assets.sh + packaging/tap-publish.sh.
+#
+# Local snapshot:   goreleaser release --snapshot --clean
+# Release build:    goreleaser release --clean --skip=publish   (then scripts/release-assets.sh)
+version: 2
+project_name: moox
+
+before:
+  hooks:
+    # Not `go mod tidy` (G4-M3): a release builds the tagged tree as CI tested it,
+    # never a rewritten go.mod/go.sum. verify checks the module cache against go.sum.
+    - go mod verify
+    - ./scripts/stamp-version.sh {{ .Version }}
+    # F2: rpaster go:embeds internal/embedded/plugin, a generated copy of plugin/.
+    - ./scripts/embed-copy-image.sh
+    # The archives take share/moox whole, ignored files too: refuse anything untracked
+    # there (an agent's .claude/ state dir got into a snapshot archive this way).
+    - ./scripts/share-tracked-only.sh
+    # Names + contents of everything the archives and the public repo take from this tree.
+    - ./scripts/privacy-scan.sh --tree .
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot.{{ .ShortCommit }}"
+
+builds:
+  - id: moox
+    main: ./cmd/moox
+    binary: moox
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      - -s -w -buildid= -X github.com/MadAppGang/moox/internal/mooxroot.Version={{ .Version }}
+    hooks:
+      post:
+        - ./scripts/privacy-scan.sh --binary {{ .Path }}
+
+  - id: tt
+    main: ./cmd/tt
+    binary: tt
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      # One version variable for moox and tt (R2-H18).
+      - -s -w -buildid= -X github.com/MadAppGang/moox/internal/mooxroot.Version={{ .Version }}
+    hooks:
+      post:
+        - ./scripts/privacy-scan.sh --binary {{ .Path }}
+
+  - id: rpaster
+    dir: third_party/tmux-copy-image
+    main: ./cmd/rpaster
+    binary: rpaster
+    env: [CGO_ENABLED=0]
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    ldflags:
+      # main.go `version = "dev"` (R2-H12); rpaster is its own module, so main.version.
+      - -s -w -buildid= -X main.version={{ .Version }}
+    hooks:
+      post:
+        - ./scripts/privacy-scan.sh --binary {{ .Path }}
+
+archives:
+  - formats: [tar.gz]
+    # No version in the name: stable releases/latest/download/<asset> URLs for install.sh.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    # NO info.mode: git modes are kept (the plugins' *.tmux entry scripts must stay +x).
+    # Owner/group/mtime ARE set: by default tar records the build user's login name and
+    # group on every entry (a privacy leak into a public artifact, V9).
+    builds_info:
+      owner: root
+      group: root
+      mtime: "{{ .CommitDate }}"
+    files:
+      - src: LICENSE
+        info: &fileinfo
+          owner: root
+          group: root
+          mtime: "{{ .CommitDate }}"
+      - src: THIRD_PARTY.md
+        info: *fileinfo
+      - src: README.md
+        info: *fileinfo
+      # share/moox only, recursively (share/ itself holds the conf tests, *_test.go).
+      # A directory src takes its whole tree; `share/moox/**/*` would miss the top-level
+      # files (moox.conf), and adding `share/moox/*` double-matches the subdirectories.
+      - src: share/moox
+        info: *fileinfo
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: MadAppGang
+    name: moox
+
+# No top-level `after:` — global after-hooks are a GoReleaser Pro field (R2-H17). The artifact
+# scan is the per-build hooks.post above, the `before` tree scan, and publish.sh /
+# release-assets.sh / release-local.sh rescanning dist/.

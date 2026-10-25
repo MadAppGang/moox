@@ -1,0 +1,52 @@
+name: release
+
+# A pushed tag vX.Y.Z (publish.sh pushes the orphan commit and a lightweight tag).
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      # The Go that CI tested (go.mod's), never "stable": a newer toolchain could
+      # rewrite go.mod/go.sum or build something CI never ran (G4-M3).
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+
+      # Build only: the four archives + checksums.txt in dist/; no release API is contacted.
+      # Actions are pinned by commit and GoReleaser by exact version: this job holds
+      # contents: write and the tap token (G4-M11).
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
+        with:
+          distribution: goreleaser
+          version: "v2.19.0"
+          args: release --clean --skip=publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Scan dist/ (public patterns), render moox.rb, ONE gh release create with all six assets.
+      - name: release assets
+        run: ./scripts/release-assets.sh "$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # D16: the tap formula, only when the fine-grained tap token exists.
+      - name: tap formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
+            GH_TOKEN="$HOMEBREW_TAP_TOKEN" ./packaging/tap-publish.sh --file dist/moox.rb "$GITHUB_REF_NAME"
+          else
+            echo "::notice::HOMEBREW_TAP_TOKEN is not set; the tap formula was NOT published."
+            echo "Run locally (gh auth with push access to MadAppGang/homebrew-tap):"
+            echo "  packaging/tap-publish.sh $GITHUB_REF_NAME"
+          fi

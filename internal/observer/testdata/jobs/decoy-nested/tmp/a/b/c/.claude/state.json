@@ -1,0 +1,27 @@
+{
+  "state": "blocked",
+  "detail": "DECOY - if you can see this, the reader walked the tree",
+  "tempo": "blocked",
+  "inFlight": {
+    "kinds": [],
+    "queued": 0,
+    "tasks": 0
+  },
+  "tokens": 47104,
+  "children": null,
+  "linkScanOffset": 2101161,
+  "linkScanPath": "",
+  "template": "bg",
+  "bgIsolation": "none",
+  "name": "SYNTHETIC name",
+  "nameSource": "auto",
+  "sessionId": "decoy000-dec0-4dec-8dec-decoydecoydec",
+  "resumeSessionId": "decoy",
+  "daemonShort": "decoy",
+  "cliVersion": "2.1.233",
+  "cwd": "/home/user/dotfiles",
+  "createdAt": "2026-08-17T07:34:10.528Z",
+  "updatedAt": "2026-08-17T08:09:36.697Z",
+  "firstTerminalAt": "2026-08-17T07:47:08.443Z",
+  "backend": "daemon"
+}

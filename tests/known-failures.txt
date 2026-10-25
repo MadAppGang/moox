@@ -1,0 +1,9 @@
+# Known failing cases, by test file and the case ids its "failed:" line prints.
+# tests/run.sh counts a file listed here as passing ("xfail") only when it fails
+# with EXACTLY these ids: a new failure, or a listed case that now passes, is a
+# FAIL (so the list stays honest; remove an id here once its case is fixed).
+#
+# theme-*: the per-screen theme parity gaps carried from the dotfiles (T3, T6, …,
+# B7, B9), tracked in the implementation log; not regressions of moox itself.
+theme-blackbox.test.sh B7 B9
+theme-per-screen.test.sh T3 T3a T6 T7c T9 T11 T13 T14

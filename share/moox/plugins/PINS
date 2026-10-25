@@ -1,0 +1,16 @@
+# Vendored tmux plugins, one per line (scripts/vendor-plugins.sh reads this file):
+#   name  url  commit  license-file  spdx  mode
+# mode: plain   — the upstream tree at the commit, unmodified (minus .git, tests, media)
+#       carried — vendored once, then edited in moox (see THIRD_PARTY.md); never re-vendored blindly
+#       split   — the plugin half (.tmux entry + plugin/) here, the full Go source in third_party/<name>
+tmux-sensible           https://github.com/tmux-plugins/tmux-sensible           25cb91f42d020f675bb0a2ce3fbd3a5d96119efa  LICENSE.md   MIT          plain
+tmux-yank               https://github.com/tmux-plugins/tmux-yank               acfd36e4fcba99f8310a7dfb432111c242fe7392  LICENSE.md   MIT          plain
+tmux-open               https://github.com/tmux-plugins/tmux-open               763d0a852e6703ce0f5090a508330012a7e6788e  LICENSE.md   MIT          plain
+tmux-pain-control       https://github.com/tmux-plugins/tmux-pain-control       32b760f6652f2305dfef0acd444afc311cf5c077  LICENSE.md   MIT          plain
+tmux-jump               https://github.com/schasse/tmux-jump                    2ff4940f043cd4ad80fa25c6efa33063fb3b386b  LICENSE      GPL-3.0      plain
+tmux-fzf                https://github.com/sainnhe/tmux-fzf                     05af76daa2487575b93a4f604693b00969f19c2f  LICENSE      MIT          plain
+tmux-fzf-url            https://github.com/wfxr/tmux-fzf-url                    c71d2113b4cb00eb159ad723fc5072ff5ec738b8  LICENSE.txt  MIT          plain
+vim-tmux-navigator      https://github.com/christoomey/vim-tmux-navigator       e41c431a0c7b7388ae7ba341f01a0d217eb3a432  License.md   MIT          plain
+catppuccin-tmux         https://github.com/catppuccin/tmux                      d2d25bd3393fe43f19eb4fff6cdd2bdf5578e622  LICENSE      MIT          plain
+tmux-claude-continuity  https://github.com/MadAppGang/tmux-claude-continuity    3dc7b5ac7f41aa0b6bf565cc9096af9076ec2195  LICENSE      MIT          carried
+tmux-copy-image         https://github.com/MadAppGang/tmux-copy-image           f1c33b434c3922c5370e1f9a8911a1d19eb174e6  LICENSE      MIT          split

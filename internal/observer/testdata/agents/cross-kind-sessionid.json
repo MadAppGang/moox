@@ -1,0 +1,20 @@
+[
+  {
+    "pid": 78761,
+    "cwd": "/home/user/proj-c/dir-f/dir-g/.claude/worktrees/wt-b",
+    "kind": "interactive",
+    "startedAt": 1789536674178,
+    "sessionId": "f350c44d-d22a-4c47-b3ef-00021713db7f",
+    "name": "listed-but-unregistered",
+    "status": "idle"
+  },
+  {
+    "id": "f350c44d",
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-a",
+    "kind": "background",
+    "startedAt": 1786175947462,
+    "sessionId": "f350c44d-d22a-4c47-b3ef-00021713db7f",
+    "name": "background task 1",
+    "state": "blocked"
+  }
+]

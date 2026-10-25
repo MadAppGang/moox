@@ -1,0 +1,4 @@
+#!/bin/sh
+# A fake `claude agents --json` that never exits, for the spawn-timeout
+# test. It writes nothing and sleeps far longer than any bound in the design.
+sleep 600

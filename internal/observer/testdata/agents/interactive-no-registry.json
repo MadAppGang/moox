@@ -1,0 +1,11 @@
+[
+  {
+    "pid": 987654,
+    "cwd": "/home/user/proj-c/dir-f/dir-g/.claude/worktrees/wt-b",
+    "kind": "interactive",
+    "startedAt": 1789536674178,
+    "sessionId": "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
+    "name": "listed-but-unregistered",
+    "status": "idle"
+  }
+]

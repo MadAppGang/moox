@@ -1,0 +1,4 @@
+# Exact e-mail-shaped strings that ship inside vendored, unmodified upstream code.
+# scripts/privacy-scan.sh allows exactly these (first word of each line), nothing else.
+git@github.com        # ssh git URLs: plugin READMEs and tmux-fzf-url's URL patterns (fzf-url.sh)
+wenxuangm@gmail.com   # tmux-fzf-url author header (fzf-url.sh, fzf-url.tmux), MIT

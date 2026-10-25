@@ -1,0 +1,2 @@
+# moox-managed — edit ~/.config/moox/local.conf instead (moox setup wrote this file)
+source-file "@MOOX_SHARE@/moox.conf"

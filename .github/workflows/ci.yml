@@ -1,0 +1,146 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - name: gofmt
+        run: |
+          bad=$(git ls-files -z '*.go' | grep -zv '^third_party/' | xargs -0 gofmt -l)
+          test -z "$bad" || { echo "$bad"; exit 1; }
+      - name: vet
+        run: go vet ./...
+      - name: test (unit + audit)
+        run: go test ./...
+      - name: rpaster (third_party, its own module)
+        working-directory: third_party/tmux-copy-image
+        run: |
+          ../../scripts/embed-copy-image.sh
+          go vet ./...
+          go test ./...
+
+  tmux-e2e:
+    # Isolated tmux servers only (internal/tmuxtest): every test server runs on its own
+    # socket under a temp dir with /bin/sh panes.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, tmux: "3.6a" }
+          - { os: ubuntu-latest, tmux: "3.8" }
+          - { os: macos-latest, tmux: brew }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - name: tmux from source (${{ matrix.tmux }})
+        if: matrix.tmux != 'brew'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake zsh jq fzf
+          git clone --depth 1 --branch "${{ matrix.tmux }}" https://github.com/tmux/tmux "$RUNNER_TEMP/tmux"
+          cd "$RUNNER_TEMP/tmux"
+          sh autogen.sh
+          ./configure --prefix=/usr/local
+          make -j"$(nproc)"
+          sudo make install
+          tmux -V
+      - name: tmux from Homebrew
+        if: matrix.tmux == 'brew'
+        run: |
+          brew install tmux jq fzf
+          tmux -V
+      - name: go test -tags tmuxe2e
+        run: go test -tags tmuxe2e -count=1 ./...
+      # The shell suites (§9.5, §12.1; G4-M2): hooks, continuity, isolation,
+      # freeze/thaw, release tooling. installer/packaging need dist/ and run in
+      # the package jobs; the theme suites carry known parity failures and run
+      # in their own step below, so a new failure there cannot hide in these.
+      - name: shell suites (tests/run.sh)
+        run: bash tests/run.sh --except installer.test.sh,packaging.test.sh,theme-blackbox.test.sh,theme-per-screen.test.sh
+      - name: vendored continuity suite
+        run: bash share/moox/plugins/tmux-claude-continuity/tests/run_all.sh
+      # Exactly the ids in tests/known-failures.txt must fail (they were measured on
+      # macOS; a Linux tmux may differ, so this step reports without gating).
+      - name: theme suites (known failures)
+        continue-on-error: true
+        run: bash tests/run.sh theme-blackbox.test.sh theme-per-screen.test.sh
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: shellcheck
+        run: >-
+          shellcheck scripts/*.sh packaging/*.sh install.sh tests/*.sh tests/lib/*.sh
+          share/moox/scripts/*.sh share/moox/shell/moox.bash
+          share/moox/plugins/tmux-claude-continuity/claude-continuity.bash
+      - name: privacy scan (public patterns)
+        run: ./scripts/privacy-scan.sh --tree .
+      - name: privacy-scan identity rules and modes
+        run: |
+          bash tests/privacy-scan-identity.test.sh
+          bash tests/privacy-scan-modes.test.sh
+      - name: release-local order, tap publish, run.sh known failures
+        run: |
+          bash tests/release-local-order.test.sh
+          bash tests/tap-publish.test.sh
+          bash tests/run-known-failures.test.sh
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
+        with:
+          distribution: goreleaser
+          version: "v2.19.0"
+          args: check
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
+        with:
+          distribution: goreleaser
+          version: "v2.19.0"
+          args: release --snapshot --clean
+      - name: artifacts scan (public patterns)
+        run: ./scripts/scan-dist.sh dist
+      - name: installer (snapshot archive, fake HOME)
+        run: bash tests/installer.test.sh
+
+  # The formula end to end (§9.2, V8; G4-M2): render it against the snapshot
+  # archives, then brew style/audit/install/test/uninstall in a scratch Homebrew
+  # (a copy of the runner's, its own prefix) and setup/uninstall on a fake HOME.
+  package-brew:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7
+        with:
+          distribution: goreleaser
+          version: "v2.19.0"
+          args: release --snapshot --clean
+      - name: packaging (scratch Homebrew, fake HOME)
+        run: bash tests/packaging.test.sh

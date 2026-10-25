@@ -1,0 +1,353 @@
+[
+  {
+    "id": "ea780079",
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-a",
+    "kind": "background",
+    "startedAt": 1786175947462,
+    "sessionId": "ea780079-5a4c-444f-a80c-c6a7b29bf62c",
+    "name": "background task 1",
+    "state": "blocked"
+  },
+  {
+    "id": "7a324a6d",
+    "cwd": "/home/user/proj-b",
+    "kind": "background",
+    "startedAt": 1786952050528,
+    "sessionId": "7a324a6d-27ec-4431-b17b-70ab8ac764c7",
+    "name": "background task 2",
+    "state": "blocked"
+  },
+  {
+    "id": "97030e53",
+    "cwd": "/home/user/proj-a/dir-b/dir-c/dir-d/dir-e",
+    "kind": "background",
+    "startedAt": 1787581120044,
+    "sessionId": "97030e53-528c-4452-bbae-535400039def",
+    "name": "background task 3",
+    "state": "blocked"
+  },
+  {
+    "pid": 98049,
+    "cwd": "/home/user/proj-c/dir-f/dir-g/.claude/worktrees/wt-b",
+    "kind": "interactive",
+    "startedAt": 1789536674178,
+    "sessionId": "63dabf2c-f911-4aea-94e9-a9d872ceb0c6",
+    "name": "session-04",
+    "status": "idle"
+  },
+  {
+    "pid": 98106,
+    "cwd": "/home/user/proj-c/dir-h/dir-i/.claude/worktrees/wt-c",
+    "kind": "interactive",
+    "startedAt": 1789536674352,
+    "sessionId": "c5c389a4-6f02-41e1-94fd-fad6c2fcecab",
+    "name": "session-05",
+    "status": "idle"
+  },
+  {
+    "pid": 98134,
+    "cwd": "/home/user/proj-c/dir-h/dir-j/.claude/worktrees/wt-d",
+    "kind": "interactive",
+    "startedAt": 1789536674479,
+    "sessionId": "6971db46-f4e1-435c-9744-8e8b51ae387d",
+    "name": "session-06",
+    "status": "idle"
+  },
+  {
+    "pid": 98167,
+    "cwd": "/home/user/proj-a/dir-k/.claude/worktrees/wt-e",
+    "kind": "interactive",
+    "startedAt": 1789536674580,
+    "sessionId": "4c400317-e027-4aab-a08a-388d9e8f0a5e",
+    "name": "session-07",
+    "status": "idle"
+  },
+  {
+    "pid": 98077,
+    "cwd": "/home/user/proj-c/dir-h/dir-i/.claude/worktrees/wt-f",
+    "kind": "interactive",
+    "startedAt": 1789536674628,
+    "sessionId": "e1cfa5e1-7bd5-4084-a7b3-200a52ecc9a4",
+    "name": "session-08",
+    "status": "idle"
+  },
+  {
+    "pid": 98198,
+    "cwd": "/home/user/proj-c/dir-h/dir-l/.claude/worktrees/wt-g",
+    "kind": "interactive",
+    "startedAt": 1789536674915,
+    "sessionId": "c874de20-33c1-480a-ba90-8ae3f2f332c4",
+    "name": "session-09",
+    "status": "idle"
+  },
+  {
+    "pid": 98234,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-h",
+    "kind": "interactive",
+    "startedAt": 1789536674975,
+    "sessionId": "957591cc-8cc9-4991-8c44-38354830f771",
+    "name": "session-10",
+    "status": "idle"
+  },
+  {
+    "pid": 98325,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-i",
+    "kind": "interactive",
+    "startedAt": 1789536675114,
+    "sessionId": "9e5d6b5c-3bc9-4b64-bc75-f4e2752121d5",
+    "name": "session-11",
+    "status": "idle"
+  },
+  {
+    "pid": 98650,
+    "cwd": "/home/user/proj-a/dir-b/dir-m",
+    "kind": "interactive",
+    "startedAt": 1789536675317,
+    "sessionId": "14994211-008a-45a6-a2dc-51fb7bdba785",
+    "name": "session-12",
+    "status": "idle"
+  },
+  {
+    "pid": 98693,
+    "cwd": "/home/user/proj-b",
+    "kind": "interactive",
+    "startedAt": 1789536675405,
+    "sessionId": "d1f05570-4e47-4517-b4c5-9bda85d3bd6d",
+    "name": "session-13",
+    "status": "busy"
+  },
+  {
+    "pid": 98361,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-j",
+    "kind": "interactive",
+    "startedAt": 1789536675570,
+    "sessionId": "5ea44449-884c-45a6-99c5-67b0ee7d3998",
+    "name": "session-14",
+    "status": "idle"
+  },
+  {
+    "pid": 98463,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-k",
+    "kind": "interactive",
+    "startedAt": 1789536675771,
+    "sessionId": "e64b6677-4e9f-4b1a-9ae7-e2163071c1ed",
+    "name": "session-15",
+    "status": "idle"
+  },
+  {
+    "pid": 98558,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-l",
+    "kind": "interactive",
+    "startedAt": 1789536676361,
+    "sessionId": "441af1f4-d089-45e9-bf08-3261eee149c8",
+    "name": "session-16",
+    "status": "idle"
+  },
+  {
+    "pid": 1613,
+    "cwd": "/home/user/proj-a/dir-n",
+    "kind": "interactive",
+    "startedAt": 1789536679029,
+    "sessionId": "c93aae01-32b3-4138-81da-4318e682246e",
+    "name": "session-17",
+    "status": "idle"
+  },
+  {
+    "pid": 1061,
+    "cwd": "/home/user/.codex/worktrees/wt-m/dir-k",
+    "kind": "interactive",
+    "startedAt": 1789536679708,
+    "sessionId": "6ae3c8cb-426b-4d4c-a218-ca04fe0b5402",
+    "name": "session-18",
+    "status": "idle"
+  },
+  {
+    "pid": 2279,
+    "cwd": "/home/user/proj-a/dir-o/dir-p",
+    "kind": "interactive",
+    "startedAt": 1789536679850,
+    "sessionId": "ef85b4f5-8304-4560-b38d-f3a4320b1d1d",
+    "name": "session-19",
+    "status": "idle"
+  },
+  {
+    "pid": 2196,
+    "cwd": "/home/user/proj-a/dir-o/dir-q",
+    "kind": "interactive",
+    "startedAt": 1789536679867,
+    "sessionId": "c8d6e0df-71b3-479e-878c-d8b54add5f61",
+    "name": "session-20",
+    "status": "idle"
+  },
+  {
+    "pid": 2391,
+    "cwd": "/home/user/proj-a/dir-o/dir-p",
+    "kind": "interactive",
+    "startedAt": 1789536680111,
+    "sessionId": "6fb5230e-1b03-4894-b7e0-7920ca8cbd1c",
+    "name": "session-21",
+    "status": "idle"
+  },
+  {
+    "pid": 1971,
+    "cwd": "/home/user/proj-a/dir-o/dir-o/.claude/worktrees/wt-n",
+    "kind": "interactive",
+    "startedAt": 1789536680211,
+    "sessionId": "e428a554-3fc3-4506-b07c-b8f57d034568",
+    "name": "session-22",
+    "status": "idle"
+  },
+  {
+    "pid": 1828,
+    "cwd": "/home/user/proj-a/dir-n/.claude/worktrees/wt-o",
+    "kind": "interactive",
+    "startedAt": 1789536680473,
+    "sessionId": "5c31bd32-94fa-4832-b162-89ae323bd568",
+    "name": "session-23",
+    "status": "idle"
+  },
+  {
+    "pid": 1724,
+    "cwd": "/home/user/proj-a/dir-r/dir-s/.claude/worktrees/wt-p",
+    "kind": "interactive",
+    "startedAt": 1789536680730,
+    "sessionId": "36f34cff-7afd-4536-bee3-5d3f9e693f0d",
+    "name": "session-24",
+    "status": "idle"
+  },
+  {
+    "pid": 2063,
+    "cwd": "/home/user/proj-a/dir-o/dir-o/.claude/worktrees/wt-q",
+    "kind": "interactive",
+    "startedAt": 1789536680774,
+    "sessionId": "ed77ffcb-2b44-45ec-a3f0-50aa093614e6",
+    "name": "session-25",
+    "status": "idle"
+  },
+  {
+    "pid": 1926,
+    "cwd": "/home/user/proj-a/dir-o/dir-o/.claude/worktrees/wt-r",
+    "kind": "interactive",
+    "startedAt": 1789536680892,
+    "sessionId": "8c5f68cf-005a-48e3-bf25-27e046e5f879",
+    "name": "session-26",
+    "status": "idle"
+  },
+  {
+    "pid": 46799,
+    "cwd": "/home/user/proj-a/dir-t/.claude/worktrees/wt-s",
+    "kind": "interactive",
+    "startedAt": 1789541424115,
+    "sessionId": "0a180476-fe5f-4e29-b117-e10dbca60839",
+    "name": "session-27",
+    "status": "idle"
+  },
+  {
+    "pid": 15775,
+    "cwd": "/home/user/proj-a/dir-u/.claude/worktrees/wt-t",
+    "kind": "interactive",
+    "startedAt": 1789543210619,
+    "sessionId": "dc036c8b-7f08-4be1-9e6e-390f4adfd504",
+    "name": "session-28",
+    "status": "busy"
+  },
+  {
+    "pid": 83966,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-u",
+    "kind": "interactive",
+    "startedAt": 1789572670388,
+    "sessionId": "3042ba6f-2164-4d13-992b-7b58ae4377cf",
+    "name": "session-29",
+    "status": "idle"
+  },
+  {
+    "pid": 87791,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-v",
+    "kind": "interactive",
+    "startedAt": 1789632536395,
+    "sessionId": "8aa74fa9-51aa-49a4-aa93-daa739b4a6f9",
+    "name": "session-30",
+    "status": "idle"
+  },
+  {
+    "pid": 2348,
+    "cwd": "/home/user/proj-a/dir-a/.claude/worktrees/wt-w",
+    "kind": "interactive",
+    "startedAt": 1789633367802,
+    "sessionId": "ecce6937-8af1-4ca7-ae9e-996c09e10e81",
+    "name": "session-31",
+    "status": "idle"
+  },
+  {
+    "pid": 44231,
+    "cwd": "/home/user/proj-a/dir-r/dir-s/.claude/worktrees/wt-x",
+    "kind": "interactive",
+    "startedAt": 1789660511703,
+    "sessionId": "371ebab5-6d54-4184-863e-103ba71f6ea9",
+    "name": "session-32",
+    "status": "idle"
+  },
+  {
+    "pid": 98158,
+    "cwd": "/home/user/proj-a/dir-r/dir-s/.claude/worktrees/wt-y",
+    "kind": "interactive",
+    "startedAt": 1789663633118,
+    "sessionId": "9cde7134-679b-46a6-ba3f-149332bdaa52",
+    "name": "session-33",
+    "status": "idle"
+  },
+  {
+    "pid": 78761,
+    "cwd": "/home/user/proj-a/dir-v/.claude/worktrees/wt-z",
+    "kind": "interactive",
+    "startedAt": 1789685917417,
+    "sessionId": "f350c44d-d22a-4c47-b3ef-00021713db7f",
+    "name": "session-34",
+    "status": "busy"
+  },
+  {
+    "pid": 86188,
+    "cwd": "/home/user/proj-a/dir-v/.claude/worktrees/wt-27",
+    "kind": "interactive",
+    "startedAt": 1789691392211,
+    "sessionId": "9f955a47-6ede-4fce-976f-fce95fb71cd5",
+    "name": "session-35",
+    "status": "busy"
+  },
+  {
+    "pid": 25983,
+    "cwd": "/home/user/proj-b/.claude/worktrees/wt-28",
+    "kind": "interactive",
+    "startedAt": 1789697203205,
+    "sessionId": "d39bd6f3-4334-469a-b863-aa17443d43a5",
+    "name": "session-36",
+    "status": "idle"
+  },
+  {
+    "pid": 5026,
+    "cwd": "/tmp/scratch/proj-d",
+    "kind": "interactive",
+    "startedAt": 1789707043621,
+    "sessionId": "18f9a8bc-b0c3-4505-9419-56413af2f39d",
+    "name": "session-37",
+    "status": "idle"
+  },
+  {
+    "pid": 92533,
+    "cwd": "/home/user/proj-b",
+    "kind": "interactive",
+    "startedAt": 1789709883776,
+    "sessionId": "7134b8cc-3795-4b90-83e1-c5607ae23cb1",
+    "name": "session-38",
+    "status": "idle"
+  },
+  {
+    "pid": 4724,
+    "cwd": "/home/user/proj-a/dir-v/.claude/worktrees/wt-29",
+    "kind": "interactive",
+    "startedAt": 1789709970431,
+    "sessionId": "e9c21455-c6ea-4d21-98ff-4a0dda3f8798",
+    "name": "session-39",
+    "status": "busy"
+  }
+]

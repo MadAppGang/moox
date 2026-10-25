@@ -1,0 +1,10 @@
+#!/bin/sh
+# A fake `claude agents --json` that refuses to run from a deleted working
+# directory, as the real one does ("The current working directory was
+# deleted, so that command didn't work"). It answers an empty listing from
+# any directory that still exists.
+if ! pwd -P >/dev/null 2>&1; then
+	echo "error: The current working directory was deleted" >&2
+	exit 1
+fi
+echo '[]'
