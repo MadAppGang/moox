@@ -343,6 +343,29 @@ func TestASlowConsumerIsResyncedAndTheRunLoopNeverBlocks(t *testing.T) {
 
 	c := h.dial()
 	c.handshake()
+
+	// THE PRIMER: one delta that provably reached the client's socket before
+	// the burst. The writer goroutine is not scheduled in step with this one,
+	// and a full queue DISCARDS what it holds (overflowLocked). CI (ubuntu,
+	// tmux 3.8 job, v0.1.2) once ran the whole 200-rebuild burst — a few ms —
+	// before the writer pulled a single event after the handshake: it found
+	// only the resync, which is correct product behaviour for a consumer that
+	// drained nothing, and this test failed with "no deltas before it".
+	// Reproduced 5/5 by stalling the writer 50 ms after its baseline write.
+	// One publish cannot overflow a queue of 2, so the event the writer sends
+	// next is this delta; Peek waits until its bytes are in the socket
+	// without consuming a frame.
+	h.core.set(t0.Add(time.Second/2), session("s1", func(s *observer.Session) {
+		s.Status = observer.StatusBusy
+		s.RawStatus = string(observer.StatusBusy)
+	}))
+	h.publish()
+	if err := c.nc.SetReadDeadline(time.Now().Add(readBound)); err != nil {
+		t.Fatalf("read deadline: %v", err)
+	}
+	if _, err := c.rd.Peek(1); err != nil {
+		t.Fatalf("the primer delta never reached the client: %v", err)
+	}
 	// From here the client reads NOTHING.
 
 	slowest := time.Duration(0)
@@ -364,9 +387,10 @@ func TestASlowConsumerIsResyncedAndTheRunLoopNeverBlocks(t *testing.T) {
 		}
 	}
 
-	if got := h.loop.Rebuilds(); got != rebuilds+1 {
+	// +2: the publish before the dial and the primer.
+	if got := h.loop.Rebuilds(); got != rebuilds+2 {
 		t.Fatalf("the loop performed %d rebuilds, want %d — it was blocked or skipped work",
-			got, rebuilds+1)
+			got, rebuilds+2)
 	}
 	if slowest > time.Second {
 		t.Fatalf("the slowest rebuild took %s; a rebuild must never wait on a client", slowest)
@@ -399,6 +423,10 @@ func TestASlowConsumerIsResyncedAndTheRunLoopNeverBlocks(t *testing.T) {
 	}
 	if len(seen) == 0 {
 		t.Fatal("the resync arrived with no deltas before it; the queue never filled")
+	}
+	if seen[0].Type != wire.FrameSessionChanged {
+		t.Fatalf("the first frame after the baseline is %q, want the primer %q",
+			seen[0].Type, wire.FrameSessionChanged)
 	}
 	snap := c.expect(wire.FrameSnapshot)
 	if snap.Snapshot == nil || len(snap.Snapshot.Sessions) != 1 {
@@ -510,8 +538,24 @@ func TestAC9TheServerRunsForeverWithZeroArmedTimersAndPublishesNothing(t *testin
 		t.Fatalf("the server published a frame while idle: %s", extra)
 	}
 
+	// Growth is a count that STAYS above the baseline. runtime.NumGoroutine is
+	// a sum of counters the runtime itself documents as possibly inconsistent
+	// (gcount: a goroutine anywhere in the process mid-creation or mid-exit
+	// counts for an instant), and one -race -count=200 package run of v0.1.2's
+	// gate saw 9 → 10 once in ~2,600 iterations (0 in 1,000 alone), with no
+	// stack to say which. So the count is re-read until it is back at the
+	// baseline, within readBound; a leaked goroutine never comes back and still
+	// fails, now with every stack printed.
 	runtime.GC()
-	if after := runtime.NumGoroutine(); after > before {
+	after := runtime.NumGoroutine()
+	for settle := time.Now(); after > before && time.Since(settle) < readBound; {
+		time.Sleep(time.Millisecond)
+		runtime.GC()
+		after = runtime.NumGoroutine()
+	}
+	if after > before {
+		buf := make([]byte, 1<<20)
+		t.Logf("every goroutine:\n%s", buf[:runtime.Stack(buf, true)])
 		t.Fatalf("the goroutine count grew from %d to %d over 30 idle days", before, after)
 	}
 

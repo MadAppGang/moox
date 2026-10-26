@@ -913,10 +913,18 @@ func TestHangingClaudeCannotDegradePIDLiveness(t *testing.T) {
 	f.json(path, row)
 	f.panes("bb-session\t@51\t%107\t0")
 	f.write(filepath.Join(f.home, "hang-claude"), nil)
+	// --timeout bounds the WHOLE read, the pane gate's `tmux list-panes`
+	// included. At 300ms a loaded machine killed that listing at the deadline
+	// ("tmux list-panes: signal: killed" → liveReason gate-error): 9 of 30
+	// runs beside 30 busy loops, and once in a plain `go test ./...` here. That
+	// was the read budget running out, not the hung CLI degrading a gate. 1s
+	// leaves the gate room and exercises the same path: the hung spawn is cut
+	// off by its own bound (half the read, here 500ms; "timed out after …"),
+	// and the read still has to finish well inside the 3s below.
 	start := time.Now()
-	snap := f.sessions("--refresh", "--timeout=300ms", "--include-dead")
+	snap := f.sessions("--refresh", "--timeout=1s", "--include-dead")
 	if d := time.Since(start); d > 3*time.Second {
-		t.Errorf("hung corroboration took %s despite 300ms bound", d)
+		t.Errorf("hung corroboration took %s despite a 1s read bound", d)
 	}
 	eq(t, field(t, session(t, snap, "live"), "live"), true, "hung CLI does not degrade positive pid evidence")
 	eq(t, field(t, session(t, snap, "dead"), "live"), false, "hung CLI does not override dead pid")

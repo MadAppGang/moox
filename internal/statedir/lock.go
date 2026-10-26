@@ -109,9 +109,38 @@ func (d *Dir) TryLock(name string, record []byte) (*Lock, error) {
 	return nil, fmt.Errorf("%w: %s was replaced while locking", ErrBusy, d.Join(name))
 }
 
+// createRetries bounds the ENOENT retries in openLockFile.
+const createRetries = 3
+
+// openLockFile opens (creating if absent) the lock file.
+//
+// MACOS RETURNS ENOENT TO A CONCURRENT O_CREAT. Two processes that open the
+// same NEW name with O_CREAT at the same instant: on Linux both succeed; on
+// macOS (APFS, measured on Darwin 27) a loser gets ENOENT. 4 processes racing
+// the first create in each of 2000 fresh directories: 5,497–5,738 of the 6,000
+// non-creating opens failed; 0 with one process; 0 on Linux (ubuntu 26.04
+// container); 0 with one retry. It was the rare TestLock_NoReclaimRace flake
+// ("open …/save.lock: no such file or directory", 0.02 s: its contenders'
+// first iterations) and TestLock_FirstCreateRaceIsBusyOrHeld fails on every
+// run without the retry (571 errors in 4×1000).
+// In the product it is two moox processes taking a lock for the first time in
+// a fresh state directory: one of them failed with an error instead of
+// holding the lock or getting ErrBusy. The file exists by the time the error
+// returns, so the open is retried; a directory that is really gone keeps
+// answering ENOENT and the error is returned after createRetries attempts.
+func (d *Dir) openLockFile(name string) (int, error) {
+	for attempt := 0; ; attempt++ {
+		fd, err := unix.Openat(d.fd, name, unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0o600)
+		if errors.Is(err, unix.ENOENT) && attempt < createRetries {
+			continue
+		}
+		return fd, err
+	}
+}
+
 // tryLockOnce returns retry=true only for the replaced-file case.
 func (d *Dir) tryLockOnce(name string, mu *sync.Mutex) (*Lock, bool, error) {
-	fd, err := unix.Openat(d.fd, name, unix.O_RDWR|unix.O_CREAT|unix.O_NOFOLLOW|unix.O_NONBLOCK|unix.O_CLOEXEC, 0o600)
+	fd, err := d.openLockFile(name)
 	if err != nil {
 		if errors.Is(err, unix.ELOOP) {
 			return nil, false, fmt.Errorf("%w: %s", ErrSymlink, d.Join(name))

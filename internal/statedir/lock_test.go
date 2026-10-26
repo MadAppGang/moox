@@ -91,8 +91,41 @@ func lockHelper(mode string) int {
 		}
 		fmt.Println(won)
 		return 0
+	case "first-create":
+		// LOCK_DIR is a root; for i in 0..ITER-1 wait (spinning, no timer)
+		// until ROOT/i exists, then TryLock NAME in it once. Prints one line
+		// per result that is neither a hold nor ErrBusy.
+		return firstCreate(os.Getenv("LOCK_DIR"), name)
 	}
 	return 1
+}
+
+func firstCreate(root, name string) int {
+	iters, _ := strconv.Atoi(os.Getenv("LOCK_ITER"))
+	bad := 0
+	for i := 0; i < iters; i++ {
+		dir := filepath.Join(root, strconv.Itoa(i))
+		var d *statedir.Dir
+		for start := time.Now(); d == nil; {
+			if time.Since(start) > 10*time.Second {
+				fmt.Println("timeout waiting for", dir)
+				return 7
+			}
+			d, _ = statedir.OpenExisting(dir, filepath.Join(root, "no-claude"))
+		}
+		l, err := d.TryLock(name, nil)
+		switch {
+		case err == nil:
+			l.Release()
+		case errors.Is(err, statedir.ErrBusy):
+		default:
+			bad++
+			fmt.Println("err:", err)
+		}
+		_ = d.Close()
+	}
+	fmt.Println("bad", bad)
+	return 0
 }
 
 type holder struct {
@@ -316,6 +349,52 @@ func TestLock_PublishRefusedIfPathReplaced(t *testing.T) {
 	}
 	if err := l.Check(); !errors.Is(err, statedir.ErrBusy) {
 		t.Fatalf("Check after replacement: %v", err)
+	}
+}
+
+// TestLock_FirstCreateRaceIsBusyOrHeld: processes that take a lock for the
+// FIRST time at the same instant — the file does not exist yet — each either
+// hold it or get ErrBusy; none gets an error. macOS answers a concurrent
+// O_CREAT of a new name with ENOENT (see openLockFile); without the retry this
+// failed on every run on Darwin (571 "open …: no such file or directory" in
+// 4×1000 races, measured), and it was the cause of TestLock_NoReclaimRace's
+// rare flake. Linux never fails it. The parent creates fresh directories one
+// at a time; the contenders spin until each appears, so their opens collide.
+func TestLock_FirstCreateRaceIsBusyOrHeld(t *testing.T) {
+	root := shortTemp(t)
+	const procs, iters = 4, 1000
+	cmds := make([]*exec.Cmd, procs)
+	outs := make([]*strings.Builder, procs)
+	for i := range cmds {
+		c := exec.Command(os.Args[0], "-test.run=^$")
+		c.Env = append(os.Environ(), helperEnv+"=first-create", "LOCK_DIR="+root,
+			"LOCK_NAME=save.lock", "LOCK_ITER="+strconv.Itoa(iters))
+		outs[i] = &strings.Builder{}
+		c.Stdout = outs[i]
+		if err := c.Start(); err != nil {
+			t.Fatal(err)
+		}
+		cmds[i] = c
+	}
+	for i := 0; i < iters; i++ {
+		if err := os.Mkdir(filepath.Join(root, strconv.Itoa(i)), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		// Long enough for every contender to reach the directory; a busy
+		// wait, not a timer.
+		for start := time.Now(); time.Since(start) < 200*time.Microsecond; {
+		}
+	}
+	for i, c := range cmds {
+		if err := c.Wait(); err != nil {
+			t.Fatalf("contender %d: %v (%s)", i, err, outs[i])
+		}
+		out := outs[i].String()
+		if !strings.HasSuffix(out, "bad 0\n") {
+			lines := strings.Split(strings.TrimSpace(out), "\n")
+			t.Errorf("contender %d: a first-time lock returned an error that is neither a hold nor ErrBusy: %s (first: %s)",
+				i, lines[len(lines)-1], lines[0])
+		}
 	}
 }
 
