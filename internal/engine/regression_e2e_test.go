@@ -39,6 +39,15 @@ func stubPayload(t *testing.T, s *tmuxtest.Server, pane string) string {
 	return string(b)
 }
 
+// sleepAs is a pane command that runs `sleep <args>` with argv[0] name — a
+// fake Claude ("claude") or helper. `exec -a` is a bash builtin: macOS's
+// /bin/sh is bash and has it, Linux's dash does not ("exec: -a: not found"),
+// so it is spelled through bash on every platform. Both execs keep the
+// process tree the bare `exec -a` form had.
+func sleepAs(name, args string) string {
+	return "exec bash -c 'exec -a " + name + " sleep " + args + "'"
+}
+
 // claudeUnder finds the pid of the process with argv[0] "claude" at or under
 // pid (the registry is keyed by the Claude process's own pid).
 func claudeUnder(t *testing.T, e *Engine, pid int) int {
@@ -111,7 +120,7 @@ func TestRegression_HistoricalRestoreBugs(t *testing.T) {
 		n, _ := strconv.Atoi(run("display", "-p", "-t", pane, "#{pane_pid}"))
 		return n
 	}
-	const fakeClaude = "exec -a claude sleep 1000"
+	fakeClaude := sleepAs("claude", "1000")
 	want := map[string]string{} // saved pane id → the command its restore must get
 	newS := func(name, cmd string) (sid, pane string) {
 		sid = strings.TrimSpace(s.Run(t, ch(tmuxtarget.NewSession{Name: tmuxtarget.Literal(name), Cwd: tmuxtarget.Literal(s.Home),
@@ -135,12 +144,12 @@ func TestRegression_HistoricalRestoreBugs(t *testing.T) {
 	want[r3p] = "claude 1000 --resume sid-r3"
 	// R30: a recording consumed by a shell whose hook comes up after the
 	// restore created the pane (C2: env, no pending file, no nudge).
-	_, r30p := newS("r30", "/bin/sh")
+	_, r30p := newS("r30", tmuxtest.PaneShell)
 	record(t, e, r30p, "sleep 3030")
 	want[r30p] = "sleep 3030"
 	// R4: the pane's depth-1 child is an MCP helper; the sid stays
 	// authoritative (full_command alone never disqualifies, B31).
-	_, r4p := newS("r4", "sh -c 'exec -a mcp-server sleep 1000' & exec -a claude sleep 1000")
+	_, r4p := newS("r4", "bash -c 'exec -a mcp-server sleep 1000' & "+sleepAs("claude", "1000"))
 	register(claudeUnder(t, e, panePid(r4p)), "sid-r4")
 	want[r4p] = "claude --resume sid-r4"
 	// R5: two Claudes with the same title in one window, distinct sids.
@@ -164,7 +173,7 @@ func TestRegression_HistoricalRestoreBugs(t *testing.T) {
 	}
 	want[r7p] = "claude 1000 --resume sid-r7-registry"
 	// R2: Claude two wrapper levels below the pane process.
-	_, r2p := newS("r2", `/bin/sh -c '/bin/sh -c "exec -a claude sleep 1000"; :'; :`)
+	_, r2p := newS("r2", `/bin/sh -c '/bin/sh -c "exec bash -c \"exec -a claude sleep 1000\""; :'; :`)
 	register(claudeUnder(t, e, panePid(r2p)), "sid-r2")
 	want[r2p] = "claude --resume sid-r2"
 	// R1: the `wt` launcher: a typed recording plus a sid gets --resume

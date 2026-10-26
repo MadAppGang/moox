@@ -60,3 +60,28 @@ func TestResolveVersion_LinkerStampWins(t *testing.T) {
 		t.Fatalf("dev build: ResolveVersion = %q, want %q", got, mooxroot.DevVersion)
 	}
 }
+
+// TestResolveVersion_CheckoutBuildIsDev: Go 1.24+ stamps a `go build` inside
+// a git checkout whose root is the module root (the public repo, CI) with a
+// VCS pseudo-version. That is a dev build and reports DevVersion, as moox
+// does; only the linker stamp or a module-cache build (no vcs.* settings)
+// reports a version of its own. Found by CI run 40244726496, where the dev
+// daemon reported "v0.0.0-20261025232529-55b775176075".
+func TestResolveVersion_CheckoutBuildIsDev(t *testing.T) {
+	prevStamp, prevInfo := mooxroot.Version, readBuildInfo
+	t.Cleanup(func() { mooxroot.Version, readBuildInfo = prevStamp, prevInfo })
+	mooxroot.Version = ""
+	for _, v := range []string{"v0.0.0-20261025232529-55b775176075", "v0.1.2-0.20261026000000-abcdefabcdef+dirty", "v0.1.1"} {
+		readBuildInfo = func() (*debug.BuildInfo, bool) {
+			return &debug.BuildInfo{Main: debug.Module{Version: v}, Settings: []debug.BuildSetting{
+				{Key: "vcs", Value: "git"}, {Key: "vcs.revision", Value: "55b775176075"}}}, true
+		}
+		if got := ResolveVersion(); got != mooxroot.DevVersion {
+			t.Errorf("checkout build %s: ResolveVersion = %q, want %q", v, got, mooxroot.DevVersion)
+		}
+	}
+	mooxroot.Version = "v0.1.1"
+	if got := ResolveVersion(); got != "0.1.1" {
+		t.Errorf("a stamped checkout build: ResolveVersion = %q, want the stamp 0.1.1", got)
+	}
+}

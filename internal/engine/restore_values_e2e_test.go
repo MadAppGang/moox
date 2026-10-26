@@ -79,7 +79,16 @@ func TestE2E_Restore_ResumeNotInheritedBySiblings(t *testing.T) {
 	s := tmuxtest.Start(t, tmuxtest.WithSize(160, 40))
 	e := e2eEngine(t, s)
 	e.timing.deadline = 1500 * time.Millisecond // /bin/sh panes never consume: NOT-FIRED is expected
-	names := []string{"main", "a.b", "a:b", `a\b`}
+	// Before 3.7 "a.b" and "a:b" are both stored "a_b" (session_check_name):
+	// the second cannot exist next to the first there, so it is left out.
+	var names []string
+	taken := map[string]bool{}
+	for _, n := range []string{"main", "a.b", "a:b", `a\b`} {
+		if stored := tmuxtarget.StoredSessionName(s.Version(t), n); !taken[stored] {
+			taken[stored] = true
+			names = append(names, n)
+		}
+	}
 	for i, n := range names {
 		sid := newSession(t, s, n, s.Home)
 		w2 := strings.TrimSpace(s.Run(t, "new-window", "-d", "-t", sid+":", "-P", "-F", "#{window_id}"))
@@ -143,7 +152,9 @@ func TestE2E_Restore_ResumeNotInheritedBySiblings(t *testing.T) {
 }
 
 // TestE2E_Restore_TitleWithFormatIsLiteral (B39, E2): titles, window names
-// and a session name holding #(…), #S, #P, ## and #[style] come back byte
+// and a session name holding #(…), #S, #P, ## and #[style] — and `\` in a
+// title, a window name and a session name, which tmux stores doubled (an
+// unchanged re-set would double it again each restore) — come back byte
 // for byte, and nothing runs.
 func TestE2E_Restore_TitleWithFormatIsLiteral(t *testing.T) {
 	s := tmuxtest.Start(t, tmuxtest.WithSize(160, 40))
@@ -153,9 +164,9 @@ func TestE2E_Restore_TitleWithFormatIsLiteral(t *testing.T) {
 	// reported form back would double it again.
 	titles := []string{"#(touch " + touched + ")", "#S #P ## #{pane_id}", "#[fg=red]red ##[x]", "", "✳ Claude Code",
 		`literal\backslash \\ #{x}\`}
-	sid := newSession(t, s, "fmt #S ##", s.Home)
+	sid := newSession(t, s, `fmt #S ## \`, s.Home)
 	wid := strings.TrimSpace(s.Run(t, "display", "-p", "-t", sid, "#{window_id}"))
-	s.Run(t, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal("#(touch "+touched+".w) #W"))...)
+	s.Run(t, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal("#(touch "+touched+".w) #W "+`a\b`))...)
 	ids := []string{firstPane(t, s, sid)}
 	for range titles[1:] {
 		ids = append(ids, strings.TrimSpace(s.Run(t, "split-window", "-d", "-t", wid, "-P", "-F", "#{pane_id}")))
@@ -178,7 +189,7 @@ func TestE2E_Restore_TitleWithFormatIsLiteral(t *testing.T) {
 	if w != saved.Windows[0].Name {
 		t.Errorf("window name %q, want %q", w, saved.Windows[0].Name)
 	}
-	if got := sessionNames(t, s); len(got) != 1 || got[0] != "fmt #S ##" {
+	if got := sessionNames(t, s); len(got) != 1 || got[0] != saved.Sessions[0].Name || got[0] != tmuxtarget.StoredSessionName(s.Version(t), `fmt #S ## \`) {
 		t.Errorf("sessions %q", got)
 	}
 	for _, f := range []string{touched, touched + ".w"} {

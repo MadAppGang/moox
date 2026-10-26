@@ -42,6 +42,11 @@ jobs:
           - { os: ubuntu-latest, tmux: "3.8" }
           - { os: macos-latest, tmux: brew }
     runs-on: ${{ matrix.os }}
+    # The shell suites drive tmux with a plain `tmux -L …` client: in a C
+    # locale tmux prints -F tabs and non-ASCII titles as `_`. The runners
+    # default to a UTF-8 LANG today; this keeps it so (the Go harness sets its own).
+    env:
+      LANG: ${{ matrix.os == 'macos-latest' && 'en_US.UTF-8' || 'C.UTF-8' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
@@ -51,7 +56,7 @@ jobs:
         if: matrix.tmux != 'brew'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake zsh jq fzf
+          sudo apt-get install -y libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake zsh jq fzf xclip
           git clone --depth 1 --branch "${{ matrix.tmux }}" https://github.com/tmux/tmux "$RUNNER_TEMP/tmux"
           cd "$RUNNER_TEMP/tmux"
           sh autogen.sh

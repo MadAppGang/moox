@@ -205,6 +205,11 @@ type restorer struct {
 	plan Plan
 	opts restoreOptions
 	is38 bool
+	// ver is the server's tmux: how it stores the names and titles a restore
+	// sets (tmuxtarget names.go). sessArg is the -s argument of each
+	// snapshot session (sessionArgs).
+	ver     tmuxtarget.Version
+	sessArg map[string]string
 	// manual is a requested (not boot) restore: its bootstrap pane is
 	// checked again under the lock (G1-2-H1).
 	manual bool
@@ -218,6 +223,60 @@ type restorer struct {
 	warnings []string
 	orphans  []string
 }
+
+// sessionArgs is the -s argument of every snapshot session: the name decoded
+// (tmuxtarget.NameArg). tmux vis-encodes session names, so the name a save
+// read back is already encoded, and passing it verbatim would grow every
+// backslash by one per restore. Before 3.7 ':' and '.' also become '_', so
+// two names of a snapshot taken on a newer tmux ("a:b", "a.b") can meet on
+// one stored name there: the later gets a "-2" suffix instead of failing
+// new-session with "duplicate session" (every row of it a miss).
+func (r *restorer) sessionArgs(snap *snapshot.Snapshot) map[string]string {
+	args := make(map[string]string, len(snap.Sessions))
+	taken := map[string]bool{}
+	for _, se := range snap.Sessions {
+		base := tmuxtarget.NameArg(r.ver, se.Name)
+		arg := base
+		for k := 2; taken[r.stored(arg)]; k++ {
+			arg = base + "-" + strconv.Itoa(k)
+		}
+		taken[r.stored(arg)] = true
+		args[se.Name] = arg
+		if s := r.stored(arg); s != se.Name {
+			r.e.logf("SESSION-NAME %q is created as %q, which this tmux stores as %q", se.Name, arg, s)
+		}
+	}
+	return args
+}
+
+// stored is the name this server gives a session created with -s arg.
+func (r *restorer) stored(arg string) string { return tmuxtarget.StoredSessionName(r.ver, arg) }
+
+// sessionArgOf is the -s argument of snapshot session name.
+func (r *restorer) sessionArgOf(name string) string {
+	if a, ok := r.sessArg[name]; ok {
+		return a
+	}
+	return tmuxtarget.NameArg(r.ver, name)
+}
+
+// sessionName is the Lit a snapshot session is created with.
+func (r *restorer) sessionName(name string) tmuxtarget.Lit {
+	return tmuxtarget.Literal(r.sessionArgOf(name))
+}
+
+// storedName is what the server will call snapshot session name.
+func (r *restorer) storedName(name string) string { return r.stored(r.sessionArgOf(name)) }
+
+// windowName is the Lit a window name is set with: decoded, as tmux encodes
+// window names again (NameArg).
+func (r *restorer) windowName(name string) tmuxtarget.Lit {
+	return tmuxtarget.Literal(tmuxtarget.NameArg(r.ver, name))
+}
+
+// titleArg is the Lit a pane title is set back with (TitleArg: verbatim
+// where tmux stores titles verbatim, before 3.7).
+func (r *restorer) titleArg(title string) tmuxtarget.Lit { return tmuxtarget.TitleArg(r.ver, title) }
 
 func (r *restorer) warn(format string, a ...any) {
 	s := fmt.Sprintf(format, a...)
@@ -312,10 +371,12 @@ func (e *Engine) Restore(ctx context.Context, req RestoreRequest) (res RestoreRe
 			return res, fmt.Errorf("engine: set @moox-restoring: %w", err)
 		}
 	}
-	r := &restorer{e: e, ctx: ctx, opts: opts, manual: req.Kind != KindBoot, created: map[string]string{}, sessID: map[string]string{}}
-	if v, err := tmuxtarget.ParseVersion(opts.version); err == nil && v.AtLeast(3, 8) {
-		r.is38 = true
+	r := &restorer{e: e, ctx: ctx, opts: opts, manual: req.Kind != KindBoot, created: map[string]string{}, sessID: map[string]string{},
+		ver: tmuxtarget.Version{Master: true}} // an unparsable #{version} reads as the newest tmux
+	if v, err := tmuxtarget.ParseVersion(opts.version); err == nil {
+		r.ver, r.is38 = v, v.AtLeast(3, 8)
 	}
+	r.sessArg = r.sessionArgs(src.snap)
 	// 1. Bootstrap (T5, U3): the single pre-existing session, by its $id. A
 	// populated server is refused before anything is written (B47).
 	boot, err := r.bootstrap(src.snap)
@@ -724,7 +785,7 @@ func (r *restorer) bootstrap(snap *snapshot.Snapshot) (*bootstrapSession, error)
 		}
 	}
 	for _, se := range snap.Sessions {
-		if se.Name == b.name {
+		if r.storedName(se.Name) == b.name {
 			newName := moxBootPrefix + strconv.Itoa(os.Getpid())
 			if _, err := r.e.tmux.Run(r.ctx, tmuxtarget.RenameSession(b.id, tmuxtarget.Literal(newName))...); err != nil {
 				return nil, fmt.Errorf("engine: rename the bootstrap %s: %w", b.id, err)
@@ -756,7 +817,7 @@ func (r *restorer) createSession(ps PlanSession) {
 	// exec A: the session's first window and first pane. Even one command
 	// goes through Chain: tmux reads a trailing `;` in ANY argv element as a
 	// separator (a session named "semi;" fails otherwise, E5).
-	args := tmuxtarget.Chain(tmuxtarget.NewSession{Name: tmuxtarget.Literal(ps.Name), Cwd: tmuxtarget.Literal(row.Pane.Cwd),
+	args := tmuxtarget.Chain(tmuxtarget.NewSession{Name: r.sessionName(ps.Name), Cwd: tmuxtarget.Literal(row.Pane.Cwd),
 		Width: ps.Width, Height: ps.Height, Env: r.envFor(firstRow),
 		PrintFormat: "#{session_id} #{window_id} #{pane_id}"}.Args())
 	var sid, wid, pid string
@@ -805,7 +866,7 @@ func (r *restorer) createSession(ps PlanSession) {
 		ri := w.Rows[0]
 		wi := wi
 		steps = append(steps, step{
-			cmd: tmuxtarget.NewWindow{Target: sid + ":" + strconv.Itoa(w.Index), Name: tmuxtarget.Literal(w.Name),
+			cmd: tmuxtarget.NewWindow{Target: sid + ":" + strconv.Itoa(w.Index), Name: r.windowName(w.Name),
 				Cwd: tmuxtarget.Literal(r.plan.Rows[ri].Pane.Cwd), Env: r.envFor(ri),
 				PrintFormat: "#{window_id} #{pane_id}"}.Args(),
 			done: func(line string) bool {
@@ -864,7 +925,7 @@ func (r *restorer) createSession(ps PlanSession) {
 				deco = append(deco, []string{"set-option", "-p", "-t", pid, "allow-set-title", "off"},
 					[]string{"set-option", "-p", "-t", pid, "allow-rename", "off"})
 			}
-			deco = append(deco, tmuxtarget.SelectPaneTitle(pid, tmuxtarget.StoredTitle(p.Title))) // I-4
+			deco = append(deco, tmuxtarget.SelectPaneTitle(pid, r.titleArg(p.Title))) // I-4
 		}
 	}
 	r.runBestEffort("DECORATION", deco)
@@ -879,7 +940,7 @@ func (r *restorer) createSession(ps PlanSession) {
 		}
 		w := r.plan.Windows[wi]
 		r.applyLayout(w, wid)
-		wdeco = append(wdeco, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal(w.Name)))
+		wdeco = append(wdeco, tmuxtarget.RenameWindow(wid, r.windowName(w.Name)))
 		switch w.AutomaticRename {
 		case snapshot.AutoRenameOn:
 			wdeco = append(wdeco, []string{"set-option", "-w", "-t", wid, "automatic-rename", "on"})
@@ -991,7 +1052,7 @@ func (r *restorer) createGrouped(ps PlanSession) {
 		r.warn("GROUPED-SKIPPED %q: its primary %q was not created", ps.Name, ps.GroupedWith)
 		return
 	}
-	out, err := r.e.tmux.Run(r.ctx, tmuxtarget.Chain(tmuxtarget.NewSession{Name: tmuxtarget.Literal(ps.Name), Group: primary,
+	out, err := r.e.tmux.Run(r.ctx, tmuxtarget.Chain(tmuxtarget.NewSession{Name: r.sessionName(ps.Name), Group: primary,
 		PrintFormat: "#{session_id}"}.Args())...)
 	gid := strings.TrimSpace(string(out))
 	if err != nil || !strings.HasPrefix(gid, "$") {

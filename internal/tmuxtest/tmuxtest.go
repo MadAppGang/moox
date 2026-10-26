@@ -12,7 +12,8 @@
 //   - A socket name always starts moox-test- or moox-val- (Start), or the
 //     socket lives under the test's own temp root (StartCold). "default", the
 //     real tmux directory (StartCold) and $TMUX_TMPDIR are refused.
-//   - Panes run /bin/sh: SHELL, default-shell and default-command are pinned.
+//   - Panes run /bin/sh: SHELL, default-shell and default-command are pinned
+//     (PaneShell execs it, so the pane process is the shell on Linux too).
 //     A zsh pane of a scratch server running the user's rc deleted real
 //     launch recordings keyed by pane number on 2026-09-19. The only other
 //     shells are the HookZsh/HookBash fixtures, whose HOME and ZDOTDIR are
@@ -85,12 +86,23 @@ func (s Shell) Kind() string {
 	return s.kind
 }
 
-// Command is the default-command string.
+// PaneShell is the zero Shell's pane command: /bin/sh, exec'd.
+//
+// tmux runs a pane command as `<default-shell> -c "<command>"`. macOS's
+// /bin/sh (bash) execs a lone simple command, so a bare "/bin/sh" pane IS the
+// shell there; Linux's dash forks it, leaving `sh -c /bin/sh` as #{pane_pid}
+// with the interactive shell one level down in its own process group, and
+// every idle-shell and LAUNCH check then reads that wrapper, not the shell.
+// The explicit exec makes the pane's process the shell on every platform.
+const PaneShell = "exec /bin/sh"
+
+// Command is the default-command string. It always execs (see PaneShell), so
+// #{pane_pid} is the shell itself.
 func (s Shell) Command() string {
 	if s.cmd == "" {
-		return "/bin/sh"
+		return PaneShell
 	}
-	return s.cmd
+	return "exec env " + s.cmd
 }
 
 type config struct {
@@ -377,7 +389,7 @@ func Start(tb testing.TB, opts ...Option) *Server {
 	}
 
 	cmd := exec.Command("tmux", "-f", "/dev/null", "-L", name, "new-session", "-d", "-s", c.session,
-		"-x", strconv.Itoa(c.width), "-y", strconv.Itoa(c.height), "/bin/sh")
+		"-x", strconv.Itoa(c.width), "-y", strconv.Itoa(c.height), PaneShell)
 	cmd.Env = scrubbedEnv(s, c.env)
 	cmd.Dir = s.Home
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -632,6 +644,17 @@ func (s *Server) RunErr(args ...string) (string, error) {
 	defer cancel()
 	out, err := s.T.Run(ctx, args...)
 	return string(out), err
+}
+
+// Version is the running server's tmux version (#{version}), for tests whose
+// expectation depends on it: CI runs 3.6a, 3.8 and brew's tmux.
+func (s *Server) Version(tb testing.TB) tmuxtarget.Version {
+	tb.Helper()
+	v, err := tmuxtarget.ParseVersion(strings.TrimSpace(s.Run(tb, "display-message", "-p", "#{version}")))
+	if err != nil {
+		tb.Fatalf("tmuxtest: server version: %v", err)
+	}
+	return v
 }
 
 // Opt reads a global option's value ("" if unset).

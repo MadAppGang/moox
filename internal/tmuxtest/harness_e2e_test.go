@@ -111,7 +111,7 @@ func TestStart_IsolatedServer(t *testing.T) {
 			t.Errorf("global env carries %s", k)
 		}
 	}
-	if s.Opt(t, "default-shell") != "/bin/sh" || s.Opt(t, "default-command") != "/bin/sh" {
+	if s.Opt(t, "default-shell") != "/bin/sh" || s.Opt(t, "default-command") != tmuxtest.PaneShell {
 		t.Fatalf("panes are not pinned to /bin/sh")
 	}
 	if got := paneEcho(t, s, "", `printf '%s|%s' "$HOME" "${MOOX_STATE_DIR-unset}"`); got != s.Home+"|unset" {
@@ -150,7 +150,7 @@ func TestStartCold_IsolatedAndRealConf(t *testing.T) {
 	if got := s.Opt(t, "@moox-sockets"); got != "moox-val-cold" {
 		t.Errorf("@moox-sockets = %q: moox.conf's -o overwrote the harness", got)
 	}
-	if s.Opt(t, "exit-empty") != "on" || s.Opt(t, "default-command") != "/bin/sh" {
+	if s.Opt(t, "exit-empty") != "on" || s.Opt(t, "default-command") != tmuxtest.PaneShell {
 		t.Errorf("harness options missing")
 	}
 	env := globalEnv(t, s)

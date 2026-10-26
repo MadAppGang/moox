@@ -93,7 +93,7 @@ func v3RoundTrip(t *testing.T, kind string) {
 	w0 := run("display", "-p", "-t", main, "#{window_id}")
 	p0 := run("display", "-p", "-t", main, "#{pane_id}")
 	obs := run(tmuxtarget.SplitWindow{Target: p0, Horizontal: true, Cwd: tmuxtarget.Literal(a.Home), PrintFormat: "#{pane_id}",
-		Command: []string{"/bin/sh"}}.Args()...)
+		Command: []string{tmuxtest.PaneShell}}.Args()...)
 	run("set-option", "-p", "-t", obs, "@tt_obs", "1")
 	p2 := run(tmuxtarget.SplitWindow{Target: obs, Horizontal: true, Cwd: tmuxtarget.Literal(hash), PrintFormat: "#{pane_id}",
 		Command: []string{"printf 'hello-v3-contents\\n'; exec /bin/sh"}}.Args()...)
@@ -109,13 +109,13 @@ func v3RoundTrip(t *testing.T, kind string) {
 	run(tmuxtarget.NewSession{Name: tmuxtarget.Literal("main-view"), Group: main}.Args()...)
 	// api.v2 — the fake Claude, and a window whose pane has a recording.
 	api := strings.TrimSpace(a.Run(t, ch(tmuxtarget.NewSession{Name: tmuxtarget.Literal("api.v2"), Cwd: tmuxtarget.Literal(a.Home),
-		PrintFormat: "#{session_id}", Command: []string{"exec -a claude sleep 1000"}}.Args())...))
+		PrintFormat: "#{session_id}", Command: []string{sleepAs("claude", "1000")}}.Args())...))
 	claudePane := run("display", "-p", "-t", api, "#{pane_id}")
 	claudePid := run("display", "-p", "-t", claudePane, "#{pane_pid}")
 	// (a plain /bin/sh: a hook shell would clear the planted recording at
 	// its next prompt, B2)
 	recPane := run(tmuxtarget.NewWindow{Target: api + ":", Cwd: tmuxtarget.Literal(sp), PrintFormat: "#{pane_id}",
-		Command: []string{"/bin/sh"}}.Args()...)
+		Command: []string{tmuxtest.PaneShell}}.Args()...)
 	record(t, e, recPane, "sleep 1000; true")
 	byPid := filepath.Join(a.Home, ".config", "tmux-claude", "panes", "by-pid")
 	if err := os.MkdirAll(byPid, 0o700); err != nil {
@@ -251,7 +251,13 @@ func v3RoundTrip(t *testing.T, kind string) {
 	}
 	names := sessionNames(t, b)
 	sort.Strings(names)
-	if want := []string{"a:b", "api.v2", "boot", "main", "main-view"}; fmt.Sprint(names) != fmt.Sprint(want) {
+	// The names as this tmux stores them: "a_b" and "api_v2" before 3.7.
+	var want []string
+	for _, n := range []string{"a:b", "api.v2", "boot", "main", "main-view"} {
+		want = append(want, tmuxtarget.StoredSessionName(b.Version(t), n))
+	}
+	sort.Strings(want)
+	if fmt.Sprint(names) != fmt.Sprint(want) {
 		t.Errorf("sessions %q, want %q", names, want)
 	}
 	if _, err := os.Stat(touched); err == nil {

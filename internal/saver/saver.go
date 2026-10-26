@@ -40,6 +40,12 @@ const (
 	ChanRestoreReq = "moox-restore-req"
 )
 
+// SeqDirty is the option every moox-dirty hook increments before it
+// signals (active.conf). The dirty waiter reads it as it blocks and as it
+// wakes, so events whose signals cancelled out between two waiters are still
+// seen (Watcher.Seq).
+const SeqDirty = "@moox-dirty-seq"
+
 // Defaults of the three timing options (§12.4).
 const (
 	DefaultDebounce = 3 * time.Second
@@ -223,7 +229,11 @@ func (m *machine) watcher(name string, signal func()) func(context.Context) erro
 	if m.c.NewWatcher != nil {
 		return m.c.NewWatcher(name, signal)
 	}
-	return Watcher{Target: m.c.Target, Channel: name, Logf: m.logf, Signal: signal}.Run
+	w := Watcher{Target: m.c.Target, Channel: name, Logf: m.logf, Signal: signal}
+	if name == ChanDirty {
+		w.Seq = SeqDirty
+	}
+	return w.Run
 }
 
 // ---------------------------------------------------------------------------

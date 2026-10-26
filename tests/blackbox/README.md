@@ -17,7 +17,7 @@ cd tests
 go test ./...
 ```
 
-Go 1.27, macOS/Linux, stock tmux >=3.6, /bin/sh and ps are required.
+Go 1.26 (the main module's, what CI installs), macOS/Linux, stock tmux >=3.6, /bin/sh and ps are required.
 A test skips when an artifact variable it needs is unset; a configured but missing or
 non-executable artifact is an error, not a silent skip. The shipped share must correspond
 to the supplied binaries. PATH is supplemented with canonical moox/tt names, and

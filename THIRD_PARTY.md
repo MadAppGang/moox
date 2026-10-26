@@ -81,4 +81,5 @@ history has the exact diffs):
 - **`cc_tab_reconcile.sh`:** ignores Claude records whose process does not descend
   from one of this server's panes.
 - **`tests/`:** the kept upstream tests set `@claude-continuity-by-pid-dir`, tear down
-  their scratch server without `kill-server`, and run with `TMUX` unset.
+  their scratch server without `kill-server`, run with `TMUX` unset, start their panes as
+  `exec sh -i` (Linux's dash forks a lone `sh -c` command) and date with `date -r … || date -d @…`.

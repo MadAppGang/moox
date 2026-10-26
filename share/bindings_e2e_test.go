@@ -303,6 +303,22 @@ func bindingByKey(bs []binding, table, key string) (binding, bool) {
 	return binding{}, false
 }
 
+// requireClipboardTool fails a test that checks tmux-yank's prefix y/Y when
+// the machine has no clipboard command: tmux-yank binds y/Y only after
+// clipboard_copy_command finds one (yank.tmux: error_handling_if_command_not_present
+// exits first), so on a headless Linux runner the bindings under test do not
+// exist. A clear precondition failure, not a skip: CI installs xclip.
+func requireClipboardTool(t *testing.T) {
+	t.Helper()
+	for _, c := range []string{"pbcopy", "clip.exe", "wl-copy", "xsel", "xclip", "putclip"} {
+		if _, err := exec.LookPath(c); err == nil {
+			return
+		}
+	}
+	t.Fatal("no clipboard command on PATH (pbcopy, wl-copy, xsel, xclip, …): tmux-yank binds prefix y/Y only " +
+		"when it finds one — install xclip (ci.yml does)")
+}
+
 // TestE2E_Conf_LoadedBindingsSilent (G3-H2, G3-2-H1) loads the SHIPPED config
 // into an isolated server and reads back every key binding it holds, in every
 // table — including those the vendored plugins and tmux-fingers bind at load
@@ -312,6 +328,7 @@ func bindingByKey(bs []binding, table, key string) (binding, bool) {
 // that way on a standard path. A job that prints or fails after its client has
 // gone is the 3.7b cmd_run_shell_print crash. A reload rewraps nothing twice.
 func TestE2E_Conf_LoadedBindingsSilent(t *testing.T) {
+	requireClipboardTool(t)
 	s := tmuxtest.Start(t)
 	stubGate(t, s, "1")
 	s.SourceMoox(t)
@@ -393,6 +410,7 @@ bind-key -T edge l run-shell -b P/plugins/x/l1.sh \; run-shell -b P/plugins/x/l2
 // || true` (a newline before the `)` when the job has a shell comment), with
 // <original> read from the BEFORE capture, not from the silencer.
 func TestE2E_SilenceBindings_RewrapsExactly(t *testing.T) {
+	requireClipboardTool(t)
 	share, err := tmuxtest.ShareRoot()
 	if err != nil {
 		t.Fatal(err)

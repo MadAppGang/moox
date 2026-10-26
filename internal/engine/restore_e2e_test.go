@@ -150,7 +150,7 @@ func TestE2E_Restore_BootstrapUntouchedAndDropped(t *testing.T) {
 	e := e2eEngine(t, s)
 	a, b, c := mkdir(t, s, "a"), mkdir(t, s, "b"), mkdir(t, s, "c")
 	first := strings.TrimSpace(s.Run(t, "list-windows", "-t", "main", "-F", "#{window_id}"))
-	s.Run(t, "respawn-pane", "-k", "-c", a, "-t", first, "/bin/sh")
+	s.Run(t, "respawn-pane", "-k", "-c", a, "-t", first, tmuxtest.PaneShell)
 	w2 := strings.TrimSpace(s.Run(t, tmuxtarget.NewWindow{Target: "main:", Cwd: tmuxtarget.Literal(b),
 		PrintFormat: "#{window_id}"}.Args()...))
 	s.Run(t, tmuxtarget.SplitWindow{Target: w2, Cwd: tmuxtarget.Literal(c)}.Args()...)

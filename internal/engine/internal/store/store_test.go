@@ -174,7 +174,7 @@ func TestStore_PointerNeverDangles_ConcurrentSaves(t *testing.T) {
 	var tick atomic.Int64
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
-	var bad atomic.Int64
+	var bad, moved atomic.Int64
 	for r := 0; r < 4; r++ {
 		wg.Add(1)
 		go func() {
@@ -185,8 +185,20 @@ func TestStore_PointerNeverDangles_ConcurrentSaves(t *testing.T) {
 					return
 				default:
 				}
-				if _, err := s.Load(s.Pointer()); err != nil {
-					bad.Add(1)
+				// Pointer-then-Load is two reads: between them the pointer
+				// can move on and retention (Count 5) can legally delete the
+				// file it named. Dangling means the pointer STILL names a
+				// file that does not load; names never repeat (the clock
+				// ticks), so an unchanged pointer is the same publish. Seen
+				// on a 4-vCPU CI runner (run 40244726496), never on the Mac.
+				name := s.Pointer()
+				if _, err := s.Load(name); err != nil {
+					if now := s.Pointer(); now == name || now == "" {
+						bad.Add(1)
+						t.Errorf("moox-last %q (now %q) does not load: %v", name, now, err)
+					} else {
+						moved.Add(1)
+					}
 				}
 			}
 		}()
@@ -233,7 +245,8 @@ func TestStore_PointerNeverDangles_ConcurrentSaves(t *testing.T) {
 	if done.Load() != 150 {
 		t.Fatalf("%d publishes", done.Load())
 	}
-	t.Logf("150 publishes, %d busy retries, readers never saw a dangling pointer", busy.Load())
+	t.Logf("150 publishes, %d busy retries, %d reads raced a newer publish + retention, readers never saw a dangling pointer",
+		busy.Load(), moved.Load())
 }
 
 // TestStore_HealFromNewest12 (B19, B21, H1–H3, RR11, I8).

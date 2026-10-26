@@ -142,7 +142,7 @@ _t set-option -g default-shell /bin/sh >/dev/null
 # Every pane is the bare interactive shell the classifier must accept. `sh -i`
 # and not a LOGIN shell, so no ~/.profile of the user's is sourced into a test
 # pane; ENV=/dev/null closes the -i startup file too.
-_t set-option -g default-command "sh -i" >/dev/null
+_t set-option -g default-command "exec sh -i" >/dev/null # exec: dash (Linux sh) forks a lone -c command
 _t set-environment -g ENV /dev/null >/dev/null
 _t set-option -g @claude-continuity-panes-dir    "$PD" >/dev/null
 # The by-pid registry is its own option (moox R3-C2: never derived from the

@@ -36,8 +36,8 @@ TOOLS="$(dirname "$(command -v tmux)"):$HK_PATH"
 ts_start scratch                                   # %0 runs sleep (session s)
 ts set-environment -g ENV /dev/null
 # Two bare interactive shells: freezable panes (a `sleep` pane is refused).
-ts new-window -d -t s:1 -c /tmp 'sh -i'
-ts split-window -d -t s:1 -c /tmp 'sh -i'
+ts new-window -d -t s:1 -c /tmp 'exec sh -i' # exec: dash (Linux sh) forks a lone -c command
+ts split-window -d -t s:1 -c /tmp 'exec sh -i'
 PANES="$(ts list-panes -a -F '#{pane_id}' | tr '\n' ' ')"
 
 # ── The REAL default server's legacy slots, in the scratch HOME ───────────────

@@ -32,6 +32,11 @@ missing dependencies (tmux >= 3.6, fzf, jq, zsh or bash, optionally
 tmux-fingers and ruby); it never installs them. `install.sh --uninstall` removes
 exactly what it installed (see `~/.local/share/moox/install.json`).
 
+moox runs on tmux 3.6 and later (CI: 3.6a, 3.8 and Homebrew's). On 3.6 and 3.7
+it saves on fewer events (the window/pane hooks are new in 3.8) and restores
+layouts in tmux's classic format; on 3.6 tmux itself turns `:` and `.` in a
+session name into `_`, so `api.v2` comes back as `api_v2` there.
+
 The first `moox` runs `moox setup`. It asks before it changes anything, backs
 up an existing `~/.tmux.conf`, and records every change so `moox uninstall`
 restores your files byte for byte. `moox setup --dry-run` lists the actions

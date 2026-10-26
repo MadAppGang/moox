@@ -43,8 +43,26 @@ func ResolveVersion() string {
 	v := bi.Main.Version
 	// The toolchain writes "(devel)" for an unstamped main module; normalise it
 	// to our own spelling so consumers see one value, not two.
-	if v == "" || v == "(devel)" {
+	if v == "" || v == "(devel)" || builtInCheckout(bi) {
 		return DevelVersion
 	}
 	return v
+}
+
+// builtInCheckout reports a `go build` inside a VCS checkout. Since Go 1.24
+// such a build stamps the main module with a version derived from the
+// repository — a pseudo-version like v0.0.0-20261025232529-55b775176075, or
+// "+dirty" — whenever the module root is the repository root (the public
+// moox repo; not the dotfiles monorepo, where moox/ is a subdirectory). It is
+// still a dev build: moox reports DevVersion for it, and a tt that reported
+// the pseudo-version instead would disagree with its own moox and sort above
+// every other dev build in the --ensure handshake. A `go install pkg@v` build
+// comes from the module cache and carries no vcs.* settings.
+func builtInCheckout(bi *debug.BuildInfo) bool {
+	for _, s := range bi.Settings {
+		if s.Key == "vcs.revision" {
+			return true
+		}
+	}
+	return false
 }

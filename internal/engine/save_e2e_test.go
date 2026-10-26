@@ -31,11 +31,11 @@ func TestE2E_Save_RealServer(t *testing.T) {
 	}
 
 	sid := strings.TrimSpace(s.Run(t, tmuxtarget.NewSession{Name: tmuxtarget.Literal("api.v2"), Cwd: tmuxtarget.Literal(s.Home),
-		PrintFormat: "#{session_id}", Command: []string{"/bin/sh"}}.Args()...))
+		PrintFormat: "#{session_id}", Command: []string{tmuxtest.PaneShell}}.Args()...))
 	wid := strings.TrimSpace(s.Run(t, "new-window", "-d", "-t", sid+":", "-P", "-F", "#{window_id}",
 		"/bin/sh -c 'echo hello-moox-contents; exec /bin/sh'"))
 	s.Run(t, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal("fix; test #(nope)"))...)
-	pid := strings.TrimSpace(s.Run(t, "split-window", "-d", "-t", wid, "-P", "-F", "#{pane_id}", "/bin/sh"))
+	pid := strings.TrimSpace(s.Run(t, "split-window", "-d", "-t", wid, "-P", "-F", "#{pane_id}", tmuxtest.PaneShell))
 	s.Run(t, tmuxtarget.SelectPaneTitle(pid, tmuxtarget.Literal("x; #{pane_id} ##"))...)
 	s.Run(t, "set-option", "-g", "@moox-active", "1")
 
@@ -73,7 +73,7 @@ func TestE2E_Save_RealServer(t *testing.T) {
 		t.Fatalf("window: %+v", win)
 	}
 	titled := paneByID(snap, pid)
-	if titled == nil || titled.Title != "x; #{pane_id} ##" || titled.Session != "api.v2" || titled.Role != snapshot.RoleShell {
+	if titled == nil || titled.Title != "x; #{pane_id} ##" || titled.Session != tmuxtarget.StoredSessionName(s.Version(t), "api.v2") || titled.Role != snapshot.RoleShell {
 		t.Fatalf("pane: %+v", titled)
 	}
 	st, err := store.Open(e.Paths(), filepath.Join(s.Home, ".claude"))

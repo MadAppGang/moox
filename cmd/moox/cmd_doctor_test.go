@@ -208,11 +208,12 @@ func TestDoctor_PathTools(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	sys := systemPathWithout(t, "jq", "tt")
 	env := func() []string {
 		e := s.Env()
 		for i, kv := range e {
 			if strings.HasPrefix(kv, "PATH=") {
-				e[i] = "PATH=" + bin + ":/bin" // no /usr/bin: macOS ships jq there
+				e[i] = "PATH=" + bin + ":" + sys // the system userland minus jq and tt
 			}
 		}
 		return e

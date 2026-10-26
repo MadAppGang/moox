@@ -14,17 +14,22 @@ import (
 )
 
 // stubGate puts a stand-in `tt` into the server's MOOX_BIN that does what the
-// real gate's config-visible half does: @moox-active (1 or 0), @moox-tmux-38,
-// and MOOX_ROOT in the server environment. It keeps these tests about the
-// config, independent of tt serve.
+// real gate's config-visible half does: @moox-active (1 or 0), @moox-tmux-38
+// (1 only on tmux >= 3.8, from the server's parsed version, as cmd/tt's gate
+// sets it), and MOOX_ROOT in the server environment. It keeps these tests
+// about the config, independent of tt serve.
 func stubGate(t *testing.T, s *tmuxtest.Server, active string) {
 	t.Helper()
+	is38 := "0"
+	if s.Version(t).AtLeast(3, 8) {
+		is38 = "1"
+	}
 	script := `#!/bin/sh
 sock=""
 while [ $# -gt 0 ]; do case "$1" in --tmux-socket) sock=$2; shift 2 ;; *) shift ;; esac; done
 [ -n "$sock" ] || exit 0
 root=$(tmux -u -S "$sock" show -gv @moox-root)
-exec tmux -u -S "$sock" set -g @moox-active ` + active + ` \; set -g @moox-tmux-38 1 \; set-environment -g MOOX_ROOT "$root"
+exec tmux -u -S "$sock" set -g @moox-active ` + active + ` \; set -g @moox-tmux-38 ` + is38 + ` \; set-environment -g MOOX_ROOT "$root"
 `
 	if err := os.WriteFile(filepath.Join(s.Bin, "tt"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
@@ -104,15 +109,17 @@ func TestE2E_Conf_LoadedHooksSilentAndIndexed(t *testing.T) {
 			t.Errorf("no hook registered in slot [%d]", slot)
 		}
 	}
-	// The 3.8-only saver hooks are inside `if -F #{@moox-tmux-38}`.
+	// The 3.8-only saver hooks are inside `if -F #{@moox-tmux-38}`: present
+	// on 3.8, absent (and never sourced — tmux 3.6 rejects the names with
+	// "invalid option") below it.
 	found := false
 	for _, h := range hooks {
 		if h.name == "window-created" && h.slot == 101 {
 			found = true
 		}
 	}
-	if !found {
-		t.Error("window-created[101] missing although @moox-tmux-38 is 1")
+	if is38 := s.Opt(t, "@moox-tmux-38") == "1"; found != is38 {
+		t.Errorf("window-created[101] registered=%v on tmux %s (@moox-tmux-38 %q)", found, s.Version(t), s.Opt(t, "@moox-tmux-38"))
 	}
 
 	// A reload replaces every indexed entry instead of appending (PV10).

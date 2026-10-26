@@ -424,8 +424,14 @@ func TestProbe_PV13_ColdStartOrdering(t *testing.T) {
 
 func TestProbe_PV14_NamesBySidAndSemicolons(t *testing.T) {
 	s := tmuxtest.Start(t)
+	ver := s.Version(t)
 	var notes []string
 	pass := true
+	// Each name is measured on its own and its session killed after: on tmux
+	// < 3.7 "a.b" and "a:b" are both stored "a_b" and would collide. The
+	// stored name must be what tmuxtarget.StoredSessionName predicts (the
+	// model the restore relies on), and creating NameArg(stored) must store
+	// the same bytes again (no backslash doubling per restore).
 	for _, name := range []string{"a.b", "a:b", `a\b`, "api.v2"} {
 		sid, err := s.RunErr(tmuxtarget.NewSession{Name: tmuxtarget.Literal(name), PrintFormat: "#{session_id}"}.Args()...)
 		if err != nil {
@@ -441,8 +447,37 @@ func TestProbe_PV14_NamesBySidAndSemicolons(t *testing.T) {
 		if clrErr != nil || env != "-MOOX_RESUME" {
 			pass = false
 		}
-		notes = append(notes, fmt.Sprintf("%q stored %q, -t =name ok=%v, -t %s clear ok=%v (%s)", name, stored, eqErr == nil, sid, clrErr == nil, env))
+		model := tmuxtarget.StoredSessionName(ver, name)
+		s.Run(t, "kill-session", "-t", sid)
+		again := ""
+		if sid2, err := s.RunErr(tmuxtarget.NewSession{Name: tmuxtarget.Literal(tmuxtarget.NameArg(ver, stored)), PrintFormat: "#{session_id}"}.Args()...); err == nil {
+			again = trim(s.Run(t, "display", "-p", "-t", trim(sid2), "#{session_name}"))
+			s.Run(t, "kill-session", "-t", trim(sid2))
+		}
+		if stored != model || again != stored {
+			pass = false
+		}
+		notes = append(notes, fmt.Sprintf("%q stored %q (model %q, recreated %q), -t =name ok=%v, -t %s clear ok=%v (%s)",
+			name, stored, model, again, eqErr == nil, sid, clrErr == nil, env))
 	}
+	// Window names: rename-window vis-encodes on every version
+	// (window_set_name; clean_name from 3.7), and renaming with
+	// NameArg(stored) keeps them — the restore's decoration sets every window
+	// name that way, last. `new-window -n` stores verbatim on 3.6a (measured:
+	// it bypasses window_set_name there) and encodes from 3.7; it is recorded,
+	// not judged.
+	wname := `w\x.y:z`
+	wid := trim(s.Run(t, tmuxtarget.NewWindow{Name: tmuxtarget.Literal(wname), PrintFormat: "#{window_id}"}.Args()...))
+	created := trim(s.Run(t, "display", "-p", "-t", wid, "#{window_name}"))
+	s.Run(t, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal(wname))...)
+	wstored := trim(s.Run(t, "display", "-p", "-t", wid, "#{window_name}"))
+	s.Run(t, tmuxtarget.RenameWindow(wid, tmuxtarget.Literal(tmuxtarget.NameArg(ver, wstored)))...)
+	wagain := trim(s.Run(t, "display", "-p", "-t", wid, "#{window_name}"))
+	if wstored != tmuxtarget.VisName(wname) || wagain != wstored {
+		pass = false
+	}
+	notes = append(notes, fmt.Sprintf("window %q: new-window -n stored %q, rename-window %q (model %q), renamed back %q",
+		wname, created, wstored, tmuxtarget.VisName(wname), wagain))
 	values := []string{"cd /tmp && ls; git status", "fix; test", ";", `x\;`, "{ a; }", `it's "q"; x`, "ends;"}
 	var cmds [][]string
 	for i, v := range values {

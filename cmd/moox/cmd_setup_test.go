@@ -451,7 +451,7 @@ func TestSetup_Idempotent(t *testing.T) {
 
 func TestSetup_ClaudeHooksNeedJq(t *testing.T) {
 	h := newFakeHome(t)
-	h.path = h.bin + ":/bin" // macOS ships /usr/bin/jq; keep it off this PATH
+	h.path = h.bin + ":" + systemPathWithout(t, "jq") // macOS ships /usr/bin/jq, and Linux /bin is /usr/bin
 	h.write("home/.claude/settings.json", `{
   "theme": "dark",
   "hooks": {

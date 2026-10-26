@@ -87,7 +87,7 @@ FREEZE="$SCRIPT_DIR/cc_freeze.sh"
 
 TMUX_CMD_STR="tmux -L $SOCKET -f /dev/null"
 NOW="$(date +%s)"
-DAY="$(date -r "$NOW" +%Y-%m-%d)"
+DAY="$(date -r "$NOW" +%Y-%m-%d 2>/dev/null || date -d "@$NOW" +%Y-%m-%d)" # BSD -r, GNU -d (as cc_freeze.sh)
 SNOW="$(printf '\xe2\x9d\x84')"   # the tombstone sigil, out of the source line
 
 pass=0
@@ -169,7 +169,7 @@ _t set-option -g default-shell /bin/sh >/dev/null
 # rather than a LOGIN shell so nothing of the user's is sourced: a login shell
 # reads ~/.profile, and the continuity precmd hook would consume the very
 # pending files this test reads back. ENV=/dev/null closes the -i path too.
-_t set-option -g default-command "sh -i" >/dev/null
+_t set-option -g default-command "exec sh -i" >/dev/null # exec: dash (Linux sh) forks a lone -c command
 _t set-environment -g ENV /dev/null >/dev/null
 _t set-option -g @claude-continuity-panes-dir    "$PD" >/dev/null
 # The by-pid registry is its own option (moox R3-C2: never derived from the

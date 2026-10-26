@@ -79,10 +79,10 @@ func TestHookShell_Fixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	z := HookZsh(t)
-	if z.Kind() != "zsh" || !strings.Contains(z.Command(), " zsh -d -i") || !strings.HasPrefix(z.Command(), "ZDOTDIR='") {
+	if z.Kind() != "zsh" || !strings.Contains(z.Command(), " zsh -d -i") || !strings.HasPrefix(z.Command(), "exec env ZDOTDIR='") {
 		t.Fatalf("zsh fixture: %q", z.Command())
 	}
-	dir := strings.TrimSuffix(strings.TrimPrefix(strings.Fields(z.Command())[0], "ZDOTDIR='"), "'")
+	dir := strings.TrimSuffix(strings.TrimPrefix(strings.Fields(z.Command())[2], "ZDOTDIR='"), "'")
 	rc, err := os.ReadFile(filepath.Join(dir, ".zshrc"))
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestHookShell_Fixtures(t *testing.T) {
 		t.Fatalf("bash fixture: %q", b.Command())
 	}
 	var zero Shell
-	if zero.Command() != "/bin/sh" || zero.Kind() != "sh" {
+	if zero.Command() != PaneShell || zero.Kind() != "sh" {
 		t.Fatalf("zero Shell = %q", zero.Command())
 	}
 }

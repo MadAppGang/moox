@@ -30,9 +30,15 @@ func TestE2E_Layout_RemoveLeafAcceptedByTmux(t *testing.T) {
 		{"tiled 5", [][]string{{"split-window", "-t", "%W"}, {"split-window", "-t", "%W"}, {"split-window", "-t", "%W"},
 			{"split-window", "-t", "%W"}, {"select-layout", "-t", "%W", "tiled"}}, 2},
 	}
+	ver := s.Version(t)
 	for _, enc := range []Format{V2, V1} {
 		for _, sh := range shapes {
 			t.Run(fmt.Sprintf("%s/%s", enc, sh.name), func(t *testing.T) {
+				if enc == V2 && !ver.AtLeast(3, 8) {
+					// JSON layouts are new in tmux 3.8 (CHANGES 3.7c→3.8); a
+					// restore on 3.6/3.7 sends v1 only (RR13, applyLayout).
+					t.Skipf("tmux %s has no v2 (JSON) layouts; restore sends v1 there", ver)
+				}
 				wid := strings.TrimSpace(s.Run(t, "new-window", "-d", "-P", "-F", "#{window_id}", "/bin/sh"))
 				for _, c := range sh.build {
 					args := make([]string, len(c))

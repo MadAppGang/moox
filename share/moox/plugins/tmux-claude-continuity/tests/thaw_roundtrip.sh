@@ -164,7 +164,7 @@ _t set-option -g default-shell /bin/sh >/dev/null
 # Panes the IMPLEMENTATION creates must not source anything of the user's: a
 # login shell would read ~/.profile, and the continuity precmd hook would eat
 # the very pending files this test reads back.
-_t set-option -g default-command "sh -i" >/dev/null
+_t set-option -g default-command "exec sh -i" >/dev/null # exec: dash (Linux sh) forks a lone -c command
 _t set-environment -g ENV /dev/null >/dev/null
 _t set-option -g @claude-continuity-panes-dir    "$PD" >/dev/null
 # The by-pid registry is its own option (moox R3-C2: never derived from the

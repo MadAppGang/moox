@@ -58,7 +58,7 @@ POPUP="$SCRIPT_DIR/cc_popup.sh"
 
 TMUX_CMD_STR="tmux -L $SOCKET -f /dev/null"
 NOW="$(date +%s)"
-DAY="$(date -r "$NOW" +%Y-%m-%d)"
+DAY="$(date -r "$NOW" +%Y-%m-%d 2>/dev/null || date -d "@$NOW" +%Y-%m-%d)" # BSD -r, GNU -d (as cc_freeze.sh)
 SNOW="$(printf '\xe2\x9d\x84')"
 
 pass=0
@@ -117,7 +117,7 @@ _t new-session -d -s _seed -c /tmp
 _t set-option -g base-index 1 >/dev/null
 _t set-option -g pane-base-index 1 >/dev/null
 _t set-option -g default-shell /bin/sh >/dev/null
-_t set-option -g default-command "sh -i" >/dev/null
+_t set-option -g default-command "exec sh -i" >/dev/null # exec: dash (Linux sh) forks a lone -c command
 _t set-environment -g ENV /dev/null >/dev/null
 _t set-option -g @claude-continuity-panes-dir    "$PD" >/dev/null
 # The by-pid registry is its own option (moox R3-C2: never derived from the

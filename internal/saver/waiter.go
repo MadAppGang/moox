@@ -1,8 +1,10 @@
 package saver
 
 import (
+	"bufio"
 	"context"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
 	"strings"
@@ -45,6 +47,18 @@ type Watcher struct {
 	Logf    func(format string, a ...any)
 	// Signal is called once per zero exit; nil ignores signals.
 	Signal func()
+	// Seq, when set, is an option every signaller increments before its
+	// `wait-for -S` (SeqDirty). tmux keeps a signal for a later waiter only
+	// while it is the only one: a second `-S` on a woken channel with no
+	// waiter blocked deletes it (cmd-wait-for.c cmd_wait_for_signal →
+	// cmd_wait_for_remove), so an even number of signals between two waiters
+	// is lost without trace — the two hooks of one rename, the four of a
+	// new-session. The waiter then runs `display -p #{Seq} ; wait-for ;
+	// display -p #{Seq}` as ONE client, which prints the counter at the
+	// instant it blocks and again as it wakes; a block value that differs
+	// from the previous wake value (or, for the first waiter, any value at
+	// all) is a signal that never arrived, and Signal is called for it.
+	Seq string
 	// Seams for tests; nil means the real ones.
 	Wait     func(ctx context.Context) error
 	Gone     func(ctx context.Context) bool
@@ -61,7 +75,21 @@ func (w Watcher) Run(ctx context.Context) error {
 	wait, gone, newTimer := w.Wait, w.Gone, w.NewTimer
 	logStart := true
 	if wait == nil {
-		wait = func(ctx context.Context) error { return w.waitFor(ctx, logStart, logf) }
+		lastWake, woke := "", false
+		missed := func(atBlock string) {
+			if (woke && atBlock != lastWake) || (!woke && atBlock != "") {
+				if w.Signal != nil {
+					w.Signal()
+				}
+			}
+		}
+		wait = func(ctx context.Context) error {
+			atWake, err := w.waitFor(ctx, logStart, logf, missed)
+			if err == nil && w.Seq != "" {
+				lastWake, woke = atWake, true
+			}
+			return err
+		}
 	}
 	if gone == nil {
 		gone = func(ctx context.Context) bool { return ServerGone(ctx, w.Target) }
@@ -129,15 +157,41 @@ func pauseFor(ctx context.Context, newTimer func(time.Duration) Timer, d time.Du
 // first spawn and every respawn after a failure are logged (WAITER-START), a
 // re-arm after a signal is not: one line per event would grow daemon.log
 // with every layout change.
-func (w Watcher) waitFor(ctx context.Context, logStart bool, logf func(string, ...any)) error {
-	cmd := w.Target.Command(ctx, "wait-for", w.Channel)
+//
+// With Seq set the child is `display -p #{Seq} ; wait-for <channel> ;
+// display -p #{Seq}`: blocked is called with the first line while the child
+// is still blocked, and the second line (the counter as it woke) is returned.
+func (w Watcher) waitFor(ctx context.Context, logStart bool, logf func(string, ...any), blocked func(atBlock string)) (string, error) {
+	if w.Seq == "" {
+		cmd := w.Target.Command(ctx, "wait-for", w.Channel)
+		if err := cmd.Start(); err != nil {
+			return "", err
+		}
+		if logStart {
+			logf("WAITER-START pid=%d channel=%s", cmd.Process.Pid, w.Channel)
+		}
+		return "", cmd.Wait()
+	}
+	seq := []string{"display-message", "-p", "#{" + w.Seq + "}"}
+	cmd := w.Target.Command(ctx, tmuxtarget.Chain(seq, []string{"wait-for", w.Channel}, seq)...)
+	out, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
 	if err := cmd.Start(); err != nil {
-		return err
+		return "", err
 	}
 	if logStart {
-		logf("WAITER-START pid=%d channel=%s", cmd.Process.Pid, w.Channel)
+		logf("WAITER-START pid=%d channel=%s seq=%s", cmd.Process.Pid, w.Channel, w.Seq)
 	}
-	return cmd.Wait()
+	r := bufio.NewReader(out)
+	atBlock, berr := r.ReadString('\n')
+	if berr == nil {
+		blocked(strings.TrimSpace(atBlock))
+	}
+	atWake, _ := r.ReadString('\n')
+	_, _ = io.Copy(io.Discard, r)
+	return strings.TrimSpace(atWake), cmd.Wait()
 }
 
 // ServerGone is the confirmation: the socket file is gone, or tmux itself
