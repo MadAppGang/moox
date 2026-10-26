@@ -1848,6 +1848,18 @@ sock_init() {
   DIRTY="$SOCK.theme.dirty"
 }
 
+# server_gone: true only when the server behind $SOCK no longer answers. Every
+# path that would keep a request alive — re-marking it, retrying a failed
+# pass, relaunching a runner — asks this first, because a dying server makes
+# exactly those paths fire: tmux SIGTERMs its run-shell jobs on the way out,
+# and every tmux call of a pass in flight then fails. A runner that re-marked
+# and retried there outlived its server and kept writing beside a socket
+# nobody serves (its stale file passes sock_init's -S test). One tmux call,
+# made only on a failure or an exit that holds the lock, never per request.
+server_gone() {
+  ! tmux display-message -p '#{pid}' >/dev/null 2>&1
+}
+
 testhook() {
   [ -n "${THEME_SYNC_TESTHOOK:-}" ] && [ -x "$THEME_SYNC_TESTHOOK" ] || return 0
   "$THEME_SYNC_TESTHOOK" "$1" </dev/null >/dev/null 2>&1 || :
@@ -1877,6 +1889,14 @@ on_exit() {
     rmdir "$SL_DIR" 2>/dev/null || :
   fi
   [ -n "$OWNER" ] || return 0
+  if server_gone; then
+    # The signal was the server's own exit (or it went meanwhile): nothing is
+    # owed to a server that is gone, so the request dies with it — no
+    # re-mark, no relaunch, nothing left beside its socket.
+    rm -f "$DIRTY" "$OWNER" 2>/dev/null || :
+    rmdir "$LOCK" 2>/dev/null || :
+    return 0
+  fi
   if [ "$INFLIGHT" = 1 ]; then { true > "$DIRTY"; } 2>/dev/null || :; fi
   rm -f "$OWNER" 2>/dev/null || :
   rmdir "$LOCK" 2>/dev/null || :
@@ -1934,6 +1954,12 @@ lock_break() {
 # `|| …` or not (measured) — a runner would die holding its lock.
 sync_request() {
   sock_init || return 0
+  # A relaunch (on_exit's) is the one request no live server just made: it
+  # writes nothing unless its server still answers.
+  case ${THEME_SYNC_GEN:-0} in
+    0) ;;
+    *) if server_gone; then return 0; fi ;;
+  esac
   { true > "$DIRTY"; } 2>/dev/null || return 0
   breaks=0
   while :; do
@@ -1954,6 +1980,13 @@ sync_request() {
         testhook pass
         if sync_once; then
           INFLIGHT=0 fails=0
+        elif server_gone; then
+          # Its server is gone: drop the request (and one made meanwhile)
+          # instead of re-marking it and retrying against nobody.
+          rm -f "$DIRTY"
+          INFLIGHT=0
+          gave_up=1
+          break
         else
           { true > "$DIRTY"; } 2>/dev/null || :
           INFLIGHT=0

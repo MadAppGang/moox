@@ -33,9 +33,11 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,6 +49,7 @@ import (
 	"github.com/MadAppGang/moox/internal/sockets"
 	"github.com/MadAppGang/moox/internal/statedir"
 	"github.com/MadAppGang/moox/internal/tmuxtarget"
+	"golang.org/x/sys/unix"
 )
 
 // Server is one isolated tmux server.
@@ -572,10 +575,24 @@ func tempRoot(tb testing.TB) string {
 		}
 		defer func() { _ = parent.Close() }()
 		if err := parent.RemoveTree(name); err != nil {
-			tb.Errorf("tmuxtest: removing %s: %v", root, err)
+			// What is left names the writer that outlived Close.
+			tb.Errorf("tmuxtest: removing %s: %v (left: %s)", root, err, leftIn(root))
 		}
 	})
 	return root
+}
+
+// leftIn lists what is still under root (at most 20 paths, relative).
+func leftIn(root string) string {
+	var left []string
+	_ = filepath.WalkDir(root, func(p string, _ fs.DirEntry, err error) error {
+		if err == nil && p != root && len(left) < 20 {
+			rel, _ := filepath.Rel(root, p)
+			left = append(left, rel)
+		}
+		return nil
+	})
+	return strings.Join(left, " ")
 }
 
 func writeFile(tb testing.TB, dir, name, content string) {
@@ -711,14 +728,21 @@ func (s *Server) Alive() bool {
 }
 
 // Close ends the server WITHOUT kill-server: it kills every session on this
-// socket, lets exit-empty end the server, and waits up to 2 s for the socket
-// to stop answering. Idempotent; registered with t.Cleanup.
+// socket, lets exit-empty end the server, waits up to 2 s for the socket to
+// stop answering, then for every process of the server to exit
+// (assertNoStragglers). Idempotent; registered with t.Cleanup.
 func (s *Server) Close() {
 	s.closeOnce.Do(func() {
 		out, err := s.RunErr("list-sessions", "-F", "#{session_id}")
 		if err != nil {
-			s.assertNoStragglers() // already gone: its processes must be too
+			s.assertNoStragglers(0) // already gone: its processes must be too
 			return
+		}
+		// The server's pid is the session id of every job it forks (it
+		// daemonized: setsid), so it is read while the server still answers.
+		pid := 0
+		if p, err := s.RunErr("display-message", "-p", "#{pid}"); err == nil {
+			pid, _ = strconv.Atoi(strings.TrimSpace(p))
 		}
 		var cmds [][]string
 		for _, id := range strings.Fields(out) {
@@ -735,29 +759,41 @@ func (s *Server) Close() {
 			}
 			pause(20 * time.Millisecond)
 		}
-		s.assertNoStragglers()
+		s.assertNoStragglers(pid)
 	})
 }
 
 // stragglerWait is how long a per-server process (the daemon, a standalone
-// observer, a waiter) may take to notice its server is gone (D8, F1): the
-// waiter's zero-exit re-arm (100 ms), its confirmation, and the observer's
-// shutdown.
+// observer, a waiter, a hook's job) may take to notice its server is gone
+// (D8, F1): the waiter's zero-exit re-arm (100 ms), its confirmation, and the
+// observer's shutdown.
 const stragglerWait = 10 * time.Second
 
 // assertNoStragglers is the harness's leak check (F1): once the server is
-// gone, every process whose argv names THIS server's socket must exit
-// within stragglerWait. One that does not is reported as a test failure and
-// then SIGKILLed — it is this test's own (its argv names the private
-// socket), so nothing else is ever signalled.
-func (s *Server) assertNoStragglers() {
-	needles := []string{s.T.Socket}
+// gone, every process of THIS server must exit within stragglerWait. A
+// process is the server's when
+//   - its argv names the socket (the server itself, the daemon, a waiter), or
+//   - it is in the server's session (serverPid, when known): every run-shell
+//     job and hook script, which name no socket in their argv and reach the
+//     server through $TMUX. tmux SIGTERMs only a job's `sh -c` wrapper on
+//     exit, so its script is orphaned and lives on in that session, or
+//   - (Linux, where /proc shows it) its environment holds this socket's
+//     $TMUX: those and the panes' processes.
+//
+// One that does not exit is reported as a test failure and then SIGKILLed —
+// it is this test's own (its argv, its session or its $TMUX is this private
+// server's), so nothing else is ever signalled. Close returns only after
+// this, so the temp root's removal (registered before Close, run after it)
+// never races a process still writing there (v0.1.3: a theme.sh runner
+// re-created <socket>.theme.dirty mid-removal).
+func (s *Server) assertNoStragglers(serverPid int) {
+	m := match{argv: []string{s.T.Socket}, env: "TMUX=" + s.T.Socket + ",", sid: serverPid}
 	if !strings.Contains(s.Name, "cold") {
-		needles = append(needles, "-L "+s.Name+" ")
+		m.argv = append(m.argv, "-L "+s.Name+" ")
 	}
 	var left []straggler
 	Poll(stragglerWait, 100*time.Millisecond, func() bool {
-		left = stragglers(needles)
+		left = stragglers(m)
 		return len(left) == 0
 	})
 	for _, p := range left {
@@ -773,35 +809,123 @@ type straggler struct {
 	command string
 }
 
-// stragglers lists processes (never this one) whose command line contains a
-// needle, from one `ps`.
-func stragglers(needles []string) []straggler {
-	out, err := exec.Command("ps", "-ww", "-axo", "pid=,command=").Output()
-	if err != nil {
-		return nil
+// match is what ties a process to one server (see assertNoStragglers).
+type match struct {
+	argv []string // substrings of the command line
+	env  string   // a NAME=VALUE prefix of an environment entry
+	sid  int      // a session id; 0 = unknown
+}
+
+// stragglers lists the live processes (never this one, never a zombie) that
+// m ties to the server.
+func stragglers(m match) []straggler {
+	ps := processes()
+	// A session id is its leader's pid. The leader here is the server; a live
+	// process under that pid that is not the server (its argv does not name
+	// the socket) means the pid was reused, and its session is not ours.
+	for _, p := range ps {
+		if m.sid > 0 && p.pid == m.sid && !m.argvTies(p) {
+			m.sid = 0
+		}
 	}
 	var found []straggler
-	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) < 2 {
-			continue
-		}
-		pid, err := strconv.Atoi(f[0])
-		if err != nil || pid == os.Getpid() {
-			continue
-		}
-		cmd := strings.Join(f[1:], " ") + " "
-		if strings.HasPrefix(f[1], "ps") {
-			continue
-		}
-		for _, n := range needles {
-			if strings.Contains(cmd, n) {
-				found = append(found, straggler{pid, strings.TrimSpace(cmd)})
-				break
-			}
+	for _, p := range ps {
+		if p.pid != os.Getpid() && m.ties(p) {
+			found = append(found, straggler{p.pid, p.command})
 		}
 	}
 	return found
+}
+
+func (m match) argvTies(p process) bool {
+	for _, n := range m.argv {
+		if strings.Contains(p.command+" ", n) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m match) ties(p process) bool {
+	if m.argvTies(p) {
+		return true
+	}
+	if m.sid > 0 {
+		if sid, err := unix.Getsid(p.pid); err == nil && sid == m.sid {
+			return true
+		}
+	}
+	return m.env != "" && p.env != nil && p.env(m.env)
+}
+
+type process struct {
+	pid     int
+	command string
+	// env reports whether the process's environment holds a NAME=VALUE
+	// prefix; nil where it cannot be read (macOS's ps -E shows no other
+	// process's environment, even this user's).
+	env func(prefix string) bool
+}
+
+// processes is every live, non-zombie process this user can see: from /proc
+// on Linux (argv and environment), from one `ps` elsewhere (argv only).
+func processes() []process {
+	if runtime.GOOS == "linux" {
+		return procProcesses()
+	}
+	out, err := exec.Command("ps", "-ww", "-axo", "pid=,stat=,command=").Output()
+	if err != nil {
+		return nil
+	}
+	var ps []process
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 3 || strings.HasPrefix(f[1], "Z") || f[2] == "ps" {
+			continue
+		}
+		pid, err := strconv.Atoi(f[0])
+		if err != nil {
+			continue
+		}
+		ps = append(ps, process{pid: pid, command: strings.Join(f[2:], " ")})
+	}
+	return ps
+}
+
+func procProcesses() []process {
+	ents, err := os.ReadDir("/proc")
+	if err != nil {
+		return nil
+	}
+	var ps []process
+	for _, e := range ents {
+		pid, err := strconv.Atoi(e.Name())
+		if err != nil {
+			continue
+		}
+		dir := filepath.Join("/proc", e.Name())
+		argv, err := os.ReadFile(filepath.Join(dir, "cmdline"))
+		if err != nil || len(argv) == 0 {
+			continue // gone, a zombie, or a kernel thread
+		}
+		ps = append(ps, process{
+			pid:     pid,
+			command: strings.TrimSpace(strings.ReplaceAll(string(argv), "\x00", " ")),
+			env: func(prefix string) bool {
+				b, err := os.ReadFile(filepath.Join(dir, "environ"))
+				if err != nil {
+					return false
+				}
+				for _, kv := range strings.Split(string(b), "\x00") {
+					if strings.HasPrefix(kv, prefix) {
+						return true
+					}
+				}
+				return false
+			},
+		})
+	}
+	return ps
 }
 
 // pause blocks for d. A one-shot timer armed by the caller and drained at
